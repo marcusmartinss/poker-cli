@@ -11,9 +11,12 @@ use crate::i18n::I18n;
 enum InputMode {
     Name,
     Lobby,
+    LobbyCreatingRoom,
+    LobbyJoiningRoom,
     RoomHost,
     RoomGuest,
     GamePlay,
+    GamePlayRaising,
 }
 
 pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
@@ -25,6 +28,7 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
         }
     };
     
+    stream.set_nonblocking(true).unwrap();
     let mut write_stream = stream.try_clone().unwrap();
     
     let (server_tx, server_rx) = mpsc::channel();
@@ -45,11 +49,12 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                         }
                     }
                 }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(50));
+                }
                 Err(_) => break,
             }
         }
-        println!("\nDisconnected from server.");
-        std::process::exit(0);
     });
     
     // Stdin Reader Thread
@@ -92,21 +97,28 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                         "1" => {
                             print!("Room name: ");
                             let _ = io::stdout().flush();
-                            let mut room_name = String::new();
-                            let _ = io::stdin().read_line(&mut room_name);
-                            send_msg(ClientMessage::CreateRoom { room_name: room_name.trim().to_string() });
+                            mode = InputMode::LobbyCreatingRoom;
                         }
                         "2" => {
                             print!("Room ID to join: ");
                             let _ = io::stdout().flush();
-                            let mut room_id_str = String::new();
-                            let _ = io::stdin().read_line(&mut room_id_str);
-                            if let Ok(id) = room_id_str.trim().parse::<u32>() {
-                                send_msg(ClientMessage::JoinRoom { room_id: id });
-                            }
+                            mode = InputMode::LobbyJoiningRoom;
                         }
                         _ => println!("Invalid option."),
                     }
+                }
+                InputMode::LobbyCreatingRoom => {
+                    let room_name = if input.is_empty() { "My Room".to_string() } else { input };
+                    send_msg(ClientMessage::CreateRoom { room_name });
+                    mode = InputMode::Lobby;
+                }
+                InputMode::LobbyJoiningRoom => {
+                    if let Ok(id) = input.parse::<u32>() {
+                        send_msg(ClientMessage::JoinRoom { room_id: id });
+                    } else {
+                        println!("Invalid Room ID.");
+                    }
+                    mode = InputMode::Lobby;
                 }
                 InputMode::RoomHost => {
                     match input.as_str() {
@@ -118,51 +130,57 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                 InputMode::RoomGuest => {
                     // Nothing to do
                 }
+                InputMode::GamePlayRaising => {
+                    if let Some(game) = &game_state_opt {
+                        if let Some(me) = game.players.iter().find(|p| p.id == my_id) {
+                            let amt_trim = input.to_lowercase();
+                            let call_amt = game.current_highest_bet - me.current_bet;
+                            
+                            let action = if amt_trim == "all" {
+                                if me.chips <= call_amt {
+                                    Some(PlayerAction::Call)
+                                } else {
+                                    Some(PlayerAction::Raise(me.chips - call_amt))
+                                }
+                            } else if let Ok(amt) = amt_trim.parse::<u32>() {
+                                Some(PlayerAction::Raise(amt))
+                            } else {
+                                println!("Invalid amount.");
+                                None
+                            };
+                            
+                            if let Some(a) = action {
+                                send_msg(ClientMessage::Action(a));
+                            } else {
+                                print!("{}\n=> ", i18n.t("actions_menu"));
+                                let _ = io::stdout().flush();
+                            }
+                        }
+                    }
+                    mode = InputMode::GamePlay;
+                }
                 InputMode::GamePlay => {
                     if let Some(game) = &game_state_opt {
                         if game.phase == engine::event::GamePhase::Finished {
                             if is_host {
                                 send_msg(ClientMessage::StartGame);
                             }
-                        } else if let Some(me) = game.players.iter().find(|p| p.id == my_id) {
+                        } else if let Some(_me) = game.players.iter().find(|p| p.id == my_id) {
                             if game.current_turn < game.players.len() && game.players[game.current_turn].id == my_id {
-                                let action = match input.as_str() {
-                                    "1" => Some(PlayerAction::Fold),
-                                    "2" => Some(PlayerAction::Check),
-                                    "3" => Some(PlayerAction::Call),
+                                match input.as_str() {
+                                    "1" => send_msg(ClientMessage::Action(PlayerAction::Fold)),
+                                    "2" => send_msg(ClientMessage::Action(PlayerAction::Check)),
+                                    "3" => send_msg(ClientMessage::Action(PlayerAction::Call)),
                                     "4" => {
                                         print!("{}", i18n.t("raise_prompt"));
                                         let _ = io::stdout().flush();
-                                        // Blocking read is ok here since it's just the amount prompt
-                                        let mut amt_input = String::new();
-                                        let _ = io::stdin().read_line(&mut amt_input);
-                                        let amt_trim = amt_input.trim().to_lowercase();
-                                        let call_amt = game.current_highest_bet - me.current_bet;
-                                        
-                                        if amt_trim == "all" {
-                                            if me.chips <= call_amt {
-                                                Some(PlayerAction::Call)
-                                            } else {
-                                                Some(PlayerAction::Raise(me.chips - call_amt))
-                                            }
-                                        } else if let Ok(amt) = amt_trim.parse::<u32>() {
-                                            Some(PlayerAction::Raise(amt))
-                                        } else {
-                                            println!("Invalid amount.");
-                                            None
-                                        }
+                                        mode = InputMode::GamePlayRaising;
                                     },
                                     _ => {
                                         println!("Unknown command.");
-                                        None
+                                        print!("{}\n=> ", i18n.t("actions_menu"));
+                                        let _ = io::stdout().flush();
                                     }
-                                };
-                                
-                                if let Some(a) = action {
-                                    send_msg(ClientMessage::Action(a));
-                                } else {
-                                    print!("{}\n=> ", i18n.t("actions_menu"));
-                                    let _ = io::stdout().flush();
                                 }
                             }
                         }
