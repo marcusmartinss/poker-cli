@@ -67,20 +67,28 @@ pub fn render_table(i18n: &crate::i18n::I18n, game: &GameState) {
         } else if is_bb {
             "[BB]"
         } else {
-            "    "
-        };
-
-        let active_token = if game.current_turn == i { "=> " } else { "   " };
-        
-        let status = if p.is_folded {
-            i18n.t("folded")
-        } else if p.is_all_in {
-            i18n.t("all_in")
-        } else {
             ""
         };
 
-        println!("  {}{} {} | ${} | {}: ${} {}", active_token, role_token, p.name, p.chips, i18n.t("bet"), p.current_bet, status);
+        let active_token = if game.current_turn == i { "=>" } else { "  " };
+        
+        let status = if p.is_folded {
+            format!("({})", i18n.t("folded"))
+        } else if p.is_all_in {
+            format!("({})", i18n.t("all_in"))
+        } else {
+            "".to_string()
+        };
+
+        // Truncate name
+        let mut name = p.name.clone();
+        if name.chars().count() > 15 {
+            name = name.chars().take(12).collect::<String>();
+            name.push_str("...");
+        }
+
+        println!("  {} {:<4} {:<15} | ${:<6} | {}: ${:<6} {}", 
+            active_token, role_token, name, p.chips, i18n.t("bet"), p.current_bet, status);
     }
     println!("---------------------------------------------------------\n");
 }
