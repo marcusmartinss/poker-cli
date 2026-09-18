@@ -251,11 +251,25 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                         }
                         
                         let room = s.rooms.get_mut(&room_id).unwrap();
+                        
+                        if room.state.phase == engine::event::GamePhase::Finished {
+                            room.state.players.retain(|p| p.chips > 0);
+                            if room.state.players.len() > 1 {
+                                room.state.dealer_button = (room.state.dealer_button + 1) % room.state.players.len();
+                            }
+                        }
+                        
                         for (pid, name) in player_names {
                             if !room.state.players.iter().any(|p| p.id == pid) {
                                 room.state.players.push(Player::new(pid, name, 1000));
                             }
                         }
+                        
+                        if room.state.players.len() < 2 {
+                            send_to_client(&mut s, client_id, &ServerMessage::Error("Not enough players with chips to start.".to_string()));
+                            return;
+                        }
+                        
                         if let Ok(events) = room.state.start_game() {
                             broadcast_game_update(&mut s, room_id, events);
                             process_bot_turns(&mut s, room_id);

@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::net_messages::{ClientMessage, ServerMessage};
 use engine::event::PlayerAction;
 use crate::i18n::I18n;
-use engine::state::GameState;
+
 
 enum InputMode {
     Name,
@@ -63,6 +63,10 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
     });
 
     let mut mode = InputMode::Name;
+    let mut my_id = 0;
+    let mut is_host = false;
+    let mut game_state_opt: Option<engine::state::GameState> = None;
+    let mut action_log: Vec<String> = Vec::new();
     
     // Helper closure to send msg
     let mut send_msg = |msg: ClientMessage| {
@@ -73,30 +77,35 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
     
     print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
     println!("--- Multiplayer Poker ---");
-    print!("Enter your player name: ");
+    print!("Enter your name: ");
     let _ = io::stdout().flush();
 
-    let mut action_log = Vec::new();
-    let mut game_state_opt: Option<GameState> = None;
-    let mut my_id = 0;
-    
     loop {
         // Handle User Input
         if let Ok(input) = input_rx.try_recv() {
             match mode {
                 InputMode::Name => {
-                    if !input.is_empty() {
-                        send_msg(ClientMessage::JoinServer { name: input.clone() });
-                    }
+                    send_msg(ClientMessage::JoinServer { name: input.clone() });
                 }
                 InputMode::Lobby => {
-                    let upper = input.to_uppercase();
-                    if upper.starts_with('C') {
-                        let parts: Vec<&str> = input.splitn(2, ' ').collect();
-                        let room_name = if parts.len() > 1 { parts[1].to_string() } else { "My Room".to_string() };
-                        send_msg(ClientMessage::CreateRoom { room_name });
-                    } else if let Ok(room_id) = input.parse::<u32>() {
-                        send_msg(ClientMessage::JoinRoom { room_id });
+                    match input.as_str() {
+                        "1" => {
+                            print!("Room name: ");
+                            let _ = io::stdout().flush();
+                            let mut room_name = String::new();
+                            let _ = io::stdin().read_line(&mut room_name);
+                            send_msg(ClientMessage::CreateRoom { room_name: room_name.trim().to_string() });
+                        }
+                        "2" => {
+                            print!("Room ID to join: ");
+                            let _ = io::stdout().flush();
+                            let mut room_id_str = String::new();
+                            let _ = io::stdin().read_line(&mut room_id_str);
+                            if let Ok(id) = room_id_str.trim().parse::<u32>() {
+                                send_msg(ClientMessage::JoinRoom { room_id: id });
+                            }
+                        }
+                        _ => println!("Invalid option."),
                     }
                 }
                 InputMode::RoomHost => {
@@ -111,7 +120,11 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                 }
                 InputMode::GamePlay => {
                     if let Some(game) = &game_state_opt {
-                        if let Some(me) = game.players.iter().find(|p| p.id == my_id) {
+                        if game.phase == engine::event::GamePhase::Finished {
+                            if is_host {
+                                send_msg(ClientMessage::StartGame);
+                            }
+                        } else if let Some(me) = game.players.iter().find(|p| p.id == my_id) {
                             if game.current_turn < game.players.len() && game.players[game.current_turn].id == my_id {
                                 let action = match input.as_str() {
                                     "1" => Some(PlayerAction::Fold),
@@ -174,23 +187,18 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                 }
                 ServerMessage::LobbyState { rooms } => {
                     print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-                    println!("=== LOBBY ===");
-                    if rooms.is_empty() {
-                        println!("No rooms available.");
-                    } else {
-                        println!("Available Rooms:");
-                        for r in rooms {
-                            let status = if r.has_started { "(In Game)" } else { "(Waiting)" };
-                            println!(" [{}] {} - {}/{} players {}", r.id, r.name, r.player_count, r.max_players, status);
-                        }
+                    println!("=== MULTIPLAYER LOBBY ===");
+                    for r in rooms {
+                        let status = if r.has_started { "IN PROGRESS" } else { "WAITING" };
+                        println!(" [{}] {} ({}/8) - {}", r.id, r.name, r.player_count, status);
                     }
-                    println!("\nCommands:");
-                    println!(" 'C <Room Name>' - Create Room");
-                    println!(" '<Room ID>'     - Join Room");
+                    println!("\n[1] Create Room");
+                    println!("[2] Join Room");
                     print!("\n=> ");
                     let _ = io::stdout().flush();
                 }
-                ServerMessage::RoomState { room_id, players, is_host } => {
+                ServerMessage::RoomState { room_id, players, is_host: h } => {
+                    is_host = h;
                     mode = if is_host { InputMode::RoomHost } else { InputMode::RoomGuest };
                     
                     print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
@@ -233,7 +241,7 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                     println!("---------------------------------------------------------\n");
                     
                     if state.phase == engine::event::GamePhase::Finished {
-                        println!("Hand Finished. Waiting for Host/Server to continue...");
+                        if is_host { println!("{}", i18n.t("press_enter")); } else { println!("Hand Finished. Waiting for Host to start next hand..."); }
                     } else if state.phase != engine::event::GamePhase::Showdown {
                         // Display my cards if I'm not folded and not finished
                         if let Some(me) = state.players.iter().find(|p| p.id == my_id) {
