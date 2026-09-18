@@ -6,7 +6,7 @@ use std::thread;
 use crate::net_messages::{ClientMessage, ServerMessage, RoomInfo};
 use engine::state::GameState;
 use engine::player::Player;
-use engine::event::{GameEvent, PlayerAction};
+use engine::event::GameEvent;
 
 #[allow(dead_code)]
 struct ClientConnection {
@@ -316,70 +316,77 @@ fn broadcast_game_update(s: &mut ServerState, room_id: u32, events: Vec<GameEven
 
 fn process_bot_turns(s: &mut ServerState, room_id: u32) {
     loop {
-        let room = match s.rooms.get_mut(&room_id) {
-            Some(r) => r,
-            None => return,
-        };
+        let (is_bot, events) = {
+            let room = match s.rooms.get_mut(&room_id) {
+                Some(r) => r,
+                None => return,
+            };
 
-        if room.state.phase == engine::event::GamePhase::WaitingForPlayers || room.state.phase == engine::event::GamePhase::Finished {
-            return;
-        }
-
-        let active_player = &room.state.players[room.state.current_turn];
-        if active_player.id < 1000 {
-            return;
-        }
-
-        let active_id = active_player.id;
-        let num_opponents = room.state.players.iter().filter(|p| p.chips > 0 && !p.is_folded && p.id != active_id).count();
-        let amount_to_call = room.state.current_highest_bet - active_player.current_bet;
-        let active_chips = active_player.chips;
-        
-        let is_aggressive = active_id % 2 == 0;
-        
-        let win_rate = if num_opponents > 0 {
-            engine::ai::calculate_win_rate(
-                &active_player.hole_cards,
-                &room.state.community_cards,
-                num_opponents,
-                1000,
-            )
-        } else {
-            1.0
-        };
-        
-        let base_win_rate = 1.0 / (num_opponents as f64 + 1.0);
-        let (raise_threshold, call_threshold) = if is_aggressive {
-            (base_win_rate + 0.05, base_win_rate - 0.15)
-        } else {
-            (base_win_rate + 0.15, base_win_rate - 0.05)
-        };
-
-        let raise_amount = if is_aggressive { 150 } else { 50 };
-        let total_raise_cost = amount_to_call + raise_amount;
-
-        let action = if win_rate > raise_threshold && active_chips >= total_raise_cost {
-            PlayerAction::Raise(raise_amount)
-        } else if amount_to_call == 0 {
-            PlayerAction::Check
-        } else if win_rate > call_threshold {
-            PlayerAction::Call
-        } else {
-            PlayerAction::Fold
-        };
-
-        match room.state.process_action(active_id, action) {
-            Ok(events) => {
-                broadcast_game_update(s, room_id, events);
+            if room.state.phase == engine::event::GamePhase::WaitingForPlayers || room.state.phase == engine::event::GamePhase::Finished {
+                return;
             }
-            Err(_) => {
-                let fallback = if amount_to_call > 0 { PlayerAction::Call } else { PlayerAction::Check };
-                if let Ok(events) = room.state.process_action(active_id, fallback) {
-                    broadcast_game_update(s, room_id, events);
-                } else {
-                    let _ = room.state.process_action(active_id, PlayerAction::Fold);
+
+            let active_player = &room.state.players[room.state.current_turn];
+            if active_player.id < 1000 {
+                return; // Not a bot
+            }
+
+            let active_id = active_player.id;
+            let num_opponents = room.state.players.iter().filter(|p| p.chips > 0 && !p.is_folded && p.id != active_id).count();
+            let amount_to_call = room.state.current_highest_bet - active_player.current_bet;
+            let active_chips = active_player.chips;
+            
+            let is_aggressive = active_id % 2 == 0;
+            
+            let win_rate = if num_opponents > 0 {
+                engine::ai::calculate_win_rate(
+                    &active_player.hole_cards,
+                    &room.state.community_cards,
+                    num_opponents,
+                    1000,
+                )
+            } else {
+                1.0
+            };
+            
+            let base_win_rate = 1.0 / (num_opponents as f64 + 1.0);
+            let (raise_threshold, call_threshold) = if is_aggressive {
+                (base_win_rate + 0.05, base_win_rate - 0.15)
+            } else {
+                (base_win_rate + 0.15, base_win_rate - 0.05)
+            };
+
+            let raise_amount = if is_aggressive { 150 } else { 50 };
+            let total_raise_cost = amount_to_call + raise_amount;
+
+            let action = if win_rate > raise_threshold && active_chips >= total_raise_cost {
+                engine::event::PlayerAction::Raise(raise_amount)
+            } else if amount_to_call == 0 {
+                engine::event::PlayerAction::Check
+            } else if win_rate > call_threshold {
+                engine::event::PlayerAction::Call
+            } else {
+                engine::event::PlayerAction::Fold
+            };
+
+            let evts = match room.state.process_action(active_id, action) {
+                Ok(e) => e,
+                Err(_) => {
+                    let fallback = if amount_to_call > 0 { engine::event::PlayerAction::Call } else { engine::event::PlayerAction::Check };
+                    match room.state.process_action(active_id, fallback) {
+                        Ok(e) => e,
+                        Err(_) => room.state.process_action(active_id, engine::event::PlayerAction::Fold).unwrap_or_default(),
+                    }
                 }
-            }
+            };
+            (true, evts)
+        };
+
+        if is_bot {
+            broadcast_game_update(s, room_id, events);
+        } else {
+            break;
         }
     }
 }
+

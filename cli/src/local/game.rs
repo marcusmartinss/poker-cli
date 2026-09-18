@@ -11,9 +11,9 @@ use crate::event_logger::process_events;
 pub fn play_local(i18n: &I18n) {
     let mut game = GameState::new();
 
-    game.players.push(Player::new(0, i18n.t("you").to_string(), 1000));
-    game.players.push(Player::new(1, i18n.t("bot_aggressive").to_string(), 1000));
-    game.players.push(Player::new(2, i18n.t("bot_conservative").to_string(), 1000));
+    game.players.push(Player::new(0, i18n.t("human_name").to_string(), 1000));
+    game.players.push(Player::new(1, i18n.t("bot2_name").to_string(), 1000));
+    game.players.push(Player::new(2, i18n.t("bot1_name").to_string(), 1000));
 
     loop {
         print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
