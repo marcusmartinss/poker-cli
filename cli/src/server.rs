@@ -101,8 +101,38 @@ fn handle_client(mut stream: TcpStream, state: Arc<Mutex<ServerState>>) {
     let mut s = state.lock().unwrap();
     if let Some(client) = s.clients.remove(&client_id) {
         if let Some(room_id) = client.room_id {
-            if let Some(room) = s.rooms.get_mut(&room_id) {
+            
+            // Phase 1: Update the room without broadcasting
+            let (is_playing, events_to_broadcast) = if let Some(room) = s.rooms.get_mut(&room_id) {
                 room.players.retain(|&id| id != client_id);
+                
+                let is_playing = room.state.phase != engine::event::GamePhase::WaitingForPlayers 
+                              && room.state.phase != engine::event::GamePhase::Finished;
+                
+                let mut events_out = None;
+                if is_playing {
+                    // Try to auto-fold them
+                    if let Ok(events) = room.state.process_action(client_id, engine::event::PlayerAction::Fold) {
+                        events_out = Some(events);
+                    }
+                    // Mark as folded and 0 chips to effectively remove them from future rounds
+                    if let Some(p) = room.state.players.iter_mut().find(|p| p.id == client_id) {
+                        p.is_folded = true;
+                        p.chips = 0;
+                    }
+                }
+                (is_playing, events_out)
+            } else {
+                (false, None)
+            };
+
+            // Phase 2: Broadcast after dropping the mutable borrow of `room`
+            if is_playing {
+                if let Some(events) = events_to_broadcast {
+                    broadcast_game_update(&mut s, room_id, events);
+                    process_bot_turns(&mut s, room_id);
+                }
+            } else {
                 broadcast_room_state(&mut s, room_id);
             }
         }

@@ -18,10 +18,10 @@ pub fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<Stri
             GameEvent::PlayerActed(id, action) => {
                 let name = game.players.iter().find(|p| p.id == *id).map(|p| p.name.as_str()).unwrap_or("Unknown");
                 match action {
-                    PlayerAction::Fold => log.push(format!("{} {}", name, i18n.t("folded"))),
-                    PlayerAction::Check => log.push(format!("{} {}", name, i18n.t("checked"))),
-                    PlayerAction::Call => log.push(format!("{} {}", name, i18n.t("called"))),
-                    PlayerAction::Raise(amt) => log.push(format!("{} {} {}", name, i18n.t("raised"), amt)),
+                    PlayerAction::Fold => log.push(format!("{} {}", name, i18n.t("folded_action"))),
+                    PlayerAction::Check => log.push(format!("{} {}", name, i18n.t("checked_action"))),
+                    PlayerAction::Call => log.push(format!("{} {}", name, i18n.t("called_action"))),
+                    PlayerAction::Raise(amt) => log.push(format!("{} {} {}", name, i18n.t("raised_by"), amt)),
                 }
             }
             GameEvent::PotAwarded(player_id, amount, _) => {
