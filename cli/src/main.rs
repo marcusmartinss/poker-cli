@@ -7,21 +7,25 @@ use std::io::{self, Write};
 use i18n::{I18n, Language};
 
 fn get_language() -> Language {
-    print!("{}[2J{}[1;1H", 27 as char, 27 as char);
-    println!("Welcome to Terminal Texas Hold'em!");
-    println!("Select Language / Selecione o Idioma:");
-    println!("[1] English");
-    println!("[2] Português");
-    print!("> ");
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+    println!("=========================================================");
+    println!("                 TEXAS HOLD'EM CLI                       ");
+    println!("=========================================================\n");
+    
+    println!("  Select Language / Escolha o Idioma:\n");
+    println!("    [1] English");
+    println!("    [2] Português (Brasil)\n");
+    
+    print!("  => ");
     let _ = io::stdout().flush();
     
-    let mut input = String::new();
-    let _ = io::stdin().read_line(&mut input);
+    let mut lang_input = String::new();
+    let _ = io::stdin().read_line(&mut lang_input);
     
-    if input.trim() == "2" {
-        Language::Portuguese
-    } else {
+    if lang_input.trim() == "1" {
         Language::English
+    } else {
+        Language::Portuguese
     }
 }
 
