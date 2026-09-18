@@ -23,10 +23,13 @@ fn main() {
         println!("6. Limpar a mesa (jogar cartas fora)");
         println!("0. Sair");
         print!("\nEscolha uma opção: ");
-        io::stdout().flush().unwrap();
+        let _ = io::stdout().flush();
 
         let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
+        if let Err(e) = io::stdin().read_line(&mut input) {
+            println!(">> [ERRO CRÍTICO] Falha ao ler a entrada do terminal: {}", e);
+            break;
+        }
         let choice = input.trim();
 
         match choice {
@@ -52,9 +55,12 @@ fn main() {
             }
             "4" => {
                 print!("Quantas cartas quer sacar? ");
-                io::stdout().flush().unwrap();
+                let _ = io::stdout().flush();
                 let mut amount_str = String::new();
-                io::stdin().read_line(&mut amount_str).unwrap();
+                if let Err(e) = io::stdin().read_line(&mut amount_str) {
+                    println!(">> [ERRO] Falha ao ler a quantidade: {}", e);
+                    continue;
+                }
                 
                 if let Ok(amount) = amount_str.trim().parse::<usize>() {
                     let mut drawn = 0;
@@ -73,15 +79,13 @@ fn main() {
                 }
             }
             "5" => {
-                if table_cards.len() < 5 {
-                    println!(">> [ERRO] Erro do Avaliador: Você precisa de no mínimo 5 cartas na mesa para avaliar. Tem apenas {}.", table_cards.len());
-                } else {
-                    println!(">> Cartas sendo avaliadas:");
-                    for c in &table_cards {
-                        println!("    - {}", c);
-                    }
-                    let hand_rank = evaluate(&table_cards);
-                    println!(">> RESULTADO DO MOTOR: {:#?}", hand_rank);
+                println!(">> Cartas sendo avaliadas:");
+                for c in &table_cards {
+                    println!("    - {}", c);
+                }
+                match evaluate(&table_cards) {
+                    Ok(hand_rank) => println!(">> RESULTADO DO MOTOR: {:#?}", hand_rank),
+                    Err(err) => println!(">> [ERRO] O motor recusou a avaliação: {}", err),
                 }
             }
             "6" => {
