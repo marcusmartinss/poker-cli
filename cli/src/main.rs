@@ -1,3 +1,6 @@
+mod net_messages;
+mod server;
+mod client;
 mod ui;
 mod i18n;
 
@@ -32,16 +35,83 @@ fn get_language() -> Language {
 fn main() {
     let lang = get_language();
     let i18n = I18n::new(lang);
+    
+    
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+    println!("=========================================================");
+    println!("                 TEXAS HOLD'EM CLI                       ");
+    println!("=========================================================\n");
+    println!("  Select Mode / Escolha o Modo:\n");
+    println!("    [1] Play Local (Offline Bots)");
+    println!("    [2] Host LAN Game");
+    println!("    [3] Join LAN Game\n");
+    print!("  => ");
+    let _ = io::stdout().flush();
+    
+    let mut mode_input = String::new();
+    let _ = io::stdin().read_line(&mut mode_input);
+    
+    match mode_input.trim() {
+        "2" => {
+            std::thread::spawn(|| {
+                server::start_server(8080);
+            });
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            client::start_client("127.0.0.1", 8080, &i18n);
+        }
+        "3" => {
+            print!("\n  IP Address (default 127.0.0.1): ");
+            let _ = io::stdout().flush();
+            let mut ip_input = String::new();
+            let _ = io::stdin().read_line(&mut ip_input);
+            let mut ip = ip_input.trim();
+            if ip.is_empty() { ip = "127.0.0.1"; }
+            client::start_client(ip, 8080, &i18n);
+        }
+        _ => {
+            play_local(i18n);
+        }
+    }
+}
 
-    println!("======================================");
-    println!("      {}     ", i18n.t("app_title"));
-    println!("======================================");
+pub fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<String>, i18n: &I18n) {
+    for event in events {
+        match event {
+            GameEvent::GameStarted => {
+                log.push(i18n.t("dealer_dealing").to_string());
+            }
+            GameEvent::PhaseChanged(phase) => {
+                log.push(format!("--- {} {} ---", i18n.t("phase"), i18n.t_phase(phase)));
+            }
+            GameEvent::CommunityCardsRevealed(cards) => {
+                let cards_str = cards.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" ");
+                log.push(format!("{} {}", i18n.t("dealer_revealed"), cards_str));
+            }
+            GameEvent::PlayerActed(id, action) => {
+                let name = game.players.iter().find(|p| p.id == *id).map(|p| p.name.as_str()).unwrap_or("Unknown");
+                match action {
+                    PlayerAction::Fold => log.push(format!("{} {}", name, i18n.t("folded_action"))),
+                    PlayerAction::Check => log.push(format!("{} {}", name, i18n.t("checked_action"))),
+                    PlayerAction::Call => log.push(format!("{} {}", name, i18n.t("called_action"))),
+                    PlayerAction::Raise(amt) => log.push(format!("{} {} {}!", name, i18n.t("raised_by"), amt)),
+                }
+            }
+            GameEvent::PotAwarded(id, amount, hand_desc) => {
+                let name = game.players.iter().find(|p| p.id == *id).map(|p| p.name.as_str()).unwrap_or("Unknown");
+                let local_hand = i18n.t_hand(hand_desc);
+                log.push(format!("*** {} {} {} {} {}! ***", name, i18n.t("won"), amount, i18n.t("chips_with"), local_hand.to_uppercase()));
+            }
+            _ => {}
+        }
+    }
+}
 
+fn play_local(i18n: I18n) {
     let mut game = GameState::new();
     
-    game.add_player(0, i18n.t("human_name").to_string(), 1000);
-    game.add_player(1, i18n.t("bot1_name").to_string(), 1000);
-    game.add_player(2, i18n.t("bot2_name").to_string(), 1000);
+    game.players.push(engine::player::Player::new(0, "Você".to_string(), 1000));
+    game.players.push(engine::player::Player::new(1, "Bot Conservador".to_string(), 1000));
+    game.players.push(engine::player::Player::new(2, "Bot Agressivo".to_string(), 1000));
 
     loop {
         println!("\n\n--------------------------------------");
@@ -266,36 +336,4 @@ fn handle_end_of_hand(game: &mut GameState, i18n: &I18n) -> bool {
 
     game.dealer_button = (game.dealer_button + 1) % game.players.len();
     false
-}
-
-fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<String>, i18n: &I18n) {
-    for event in events {
-        match event {
-            GameEvent::GameStarted => {
-                log.push(i18n.t("dealer_dealing").to_string());
-            }
-            GameEvent::PhaseChanged(phase) => {
-                log.push(format!("--- {} {} ---", i18n.t("phase"), i18n.t_phase(phase)));
-            }
-            GameEvent::CommunityCardsRevealed(cards) => {
-                let cards_str = cards.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" ");
-                log.push(format!("{} {}", i18n.t("dealer_revealed"), cards_str));
-            }
-            GameEvent::PlayerActed(id, action) => {
-                let name = game.players.iter().find(|p| p.id == *id).map(|p| p.name.as_str()).unwrap_or("Unknown");
-                match action {
-                    PlayerAction::Fold => log.push(format!("{} {}", name, i18n.t("folded_action"))),
-                    PlayerAction::Check => log.push(format!("{} {}", name, i18n.t("checked_action"))),
-                    PlayerAction::Call => log.push(format!("{} {}", name, i18n.t("called_action"))),
-                    PlayerAction::Raise(amt) => log.push(format!("{} {} {}!", name, i18n.t("raised_by"), amt)),
-                }
-            }
-            GameEvent::PotAwarded(id, amount, hand_desc) => {
-                let name = game.players.iter().find(|p| p.id == *id).map(|p| p.name.as_str()).unwrap_or("Unknown");
-                let local_hand = i18n.t_hand(hand_desc);
-                log.push(format!("*** {} {} {} {} {}! ***", name, i18n.t("won"), amount, i18n.t("chips_with"), local_hand.to_uppercase()));
-            }
-            _ => {}
-        }
-    }
 }

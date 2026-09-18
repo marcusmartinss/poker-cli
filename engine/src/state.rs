@@ -3,6 +3,7 @@ use crate::deck::Deck;
 use crate::player::Player;
 use crate::event::{GamePhase, PlayerAction, GameEvent};
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct GameState {
     pub phase: GamePhase,
     pub players: Vec<Player>,

@@ -1,6 +1,6 @@
 use crate::card::Card;
 
-#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Player {
     pub id: usize,
     pub name: String,

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 /// The hierarchy of poker hands, from lowest to highest.
 /// The order matters: `#[derive(Ord)]` tells Rust that RoyalFlush > StraightFlush, etc.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HandRank {
     HighCard([Rank; 5]),
     OnePair(Rank, [Rank; 3]),

@@ -1,6 +1,6 @@
 use crate::card::Card;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GamePhase {
     WaitingForPlayers,
     PreFlop,
@@ -11,7 +11,7 @@ pub enum GamePhase {
     Finished,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum PlayerAction {
     Fold,
     Check,
@@ -19,7 +19,7 @@ pub enum PlayerAction {
     Raise(u32),
 }
 
-#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum GameEvent {
     PlayerJoined(usize, String),
     GameStarted,
