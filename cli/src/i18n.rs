@@ -65,6 +65,7 @@ impl I18n {
                 "you_lost" => "You lost all your chips!",
                 "player_busted" => "A player was eliminated!",
                 "you_won_game" => "You eliminated everyone and WON THE GAME!",
+                "select_mode" => "Select Mode:",
                 _ => "???",
             },
             Language::Portuguese => match key {
@@ -115,6 +116,7 @@ impl I18n {
                 "you_lost" => "Você perdeu todas as suas fichas!",
                 "player_busted" => "Um jogador foi eliminado da mesa!",
                 "you_won_game" => "Você eliminou todos os bots e VENCEU O JOGO!",
+                "select_mode" => "Escolha o Modo:",
                 _ => "???",
             },
         }
