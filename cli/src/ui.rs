@@ -93,22 +93,16 @@ pub fn render_showdown(i18n: &crate::i18n::I18n, game: &GameState) {
         if p.is_folded {
             println!("\n  {} {}", p.name, i18n.t("folded_end"));
         } else {
+            // Evaluate their hand for display
             let mut all_cards = game.community_cards.clone();
             all_cards.extend(p.hole_cards.clone());
-            
-            let hand_str = if let Ok(rank) = engine::evaluator::evaluate(&all_cards) {
-                format!("{:?}", rank)
-            } else {
-                "".to_string()
+            let hand_name = match engine::evaluator::evaluate(&all_cards) {
+                Ok(rank) => i18n.t_hand(&format!("{:?}", rank)),
+                Err(_) => i18n.t_hand("Unknown"),
             };
             
-            let localized_hand = if !hand_str.is_empty() {
-                format!("- {} ", i18n.t_hand(&hand_str))
-            } else {
-                "".to_string()
-            };
-
-            println!("\n  {}'s {} {}", p.name, i18n.t("cards_end"), localized_hand);
+            let possessive_str = i18n.t_player_cards(p.id == 0, &p.name);
+            println!("\n  {} - {} ", possessive_str, hand_name);
             draw_cards_ascii(&p.hole_cards, false);
         }
     }

@@ -144,37 +144,53 @@ impl I18n {
         }
     }
 
-    pub fn t_hand(&self, hand_desc: &str) -> String {
-        let h = hand_desc.to_lowercase();
-        
-        if self.lang == Language::English {
-            if h.contains("everyone else folded") { "Everyone else folded".to_string() }
-            else if h.contains("unknown") { "Unknown".to_string() }
-            else if h.contains("highcard") { "High Card".to_string() }
-            else if h.contains("twopair") { "Two Pair".to_string() }
-            else if h.contains("pair") { "One Pair".to_string() }
-            else if h.contains("threeofakind") { "Three of a Kind".to_string() }
-            else if h.contains("straightflush") { "Straight Flush".to_string() }
-            else if h.contains("straight") { "Straight".to_string() }
-            else if h.contains("flush") { "Flush".to_string() }
-            else if h.contains("fullhouse") { "Full House".to_string() }
-            else if h.contains("fourofakind") { "Four of a Kind".to_string() }
-            else if h.contains("royalflush") { "Royal Flush".to_string() }
-            else { hand_desc.to_string() }
-        } else {
-            if h.contains("everyone else folded") { "Todos os outros correram".to_string() }
-            else if h.contains("unknown") { "Desconhecido".to_string() }
-            else if h.contains("highcard") { "Carta Alta".to_string() }
-            else if h.contains("twopair") { "Dois Pares".to_string() }
-            else if h.contains("pair") { "Um Par".to_string() }
-            else if h.contains("threeofakind") { "Trinca".to_string() }
-            else if h.contains("straightflush") { "Straight Flush".to_string() }
-            else if h.contains("straight") { "Sequência".to_string() }
-            else if h.contains("flush") { "Flush".to_string() }
-            else if h.contains("fullhouse") { "Full House".to_string() }
-            else if h.contains("fourofakind") { "Quadra".to_string() }
-            else if h.contains("royalflush") { "Royal Flush".to_string() }
-            else { hand_desc.to_string() }
+    pub fn t_hand(&self, raw: &str) -> String {
+        match self.lang {
+            Language::English => {
+                if raw.contains("Everyone else folded") || raw.contains("everyone else folded") { "Everyone else folded".to_string() }
+                else if raw.contains("HighCard") { "High Card".to_string() }
+                else if raw.contains("Pair") && !raw.contains("TwoPair") { "One Pair".to_string() }
+                else if raw.contains("TwoPair") { "Two Pair".to_string() }
+                else if raw.contains("ThreeOfAKind") { "Three of a Kind".to_string() }
+                else if raw.contains("Straight") && !raw.contains("Flush") { "Straight".to_string() }
+                else if raw.contains("Flush") && !raw.contains("Straight") { "Flush".to_string() }
+                else if raw.contains("FullHouse") { "Full House".to_string() }
+                else if raw.contains("FourOfAKind") { "Four of a Kind".to_string() }
+                else if raw.contains("StraightFlush") { "Straight Flush".to_string() }
+                else { raw.to_string() }
+            },
+            Language::Portuguese => {
+                if raw.contains("Everyone else folded") || raw.contains("everyone else folded") { "Todos os outros correram".to_string() }
+                else if raw.contains("HighCard") { "Carta Alta".to_string() }
+                else if raw.contains("Pair") && !raw.contains("TwoPair") { "Um Par".to_string() }
+                else if raw.contains("TwoPair") { "Dois Pares".to_string() }
+                else if raw.contains("ThreeOfAKind") { "Trinca".to_string() }
+                else if raw.contains("Straight") && !raw.contains("Flush") { "Sequência".to_string() }
+                else if raw.contains("Flush") && !raw.contains("Straight") { "Flush".to_string() }
+                else if raw.contains("FullHouse") { "Full House".to_string() }
+                else if raw.contains("FourOfAKind") { "Quadra".to_string() }
+                else if raw.contains("StraightFlush") { "Straight Flush".to_string() }
+                else { raw.to_string() }
+            },
+        }
+    }
+
+    pub fn t_player_cards(&self, is_human: bool, player_name: &str) -> String {
+        match self.lang {
+            Language::English => {
+                if is_human {
+                    "Your CARDS:".to_string()
+                } else {
+                    format!("{}'s CARDS:", player_name)
+                }
+            },
+            Language::Portuguese => {
+                if is_human {
+                    "Suas CARTAS:".to_string()
+                } else {
+                    format!("CARTAS de {}:", player_name)
+                }
+            }
         }
     }
 }

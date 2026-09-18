@@ -118,8 +118,13 @@ fn main() {
                         let _ = io::stdin().read_line(&mut amt_input);
                         
                         let amt_trim = amt_input.trim().to_lowercase();
+                        let call_amt = game.current_highest_bet - active_player.current_bet;
                         if amt_trim == "all" {
-                            PlayerAction::Raise(active_player.chips)
+                            if active_player.chips <= call_amt {
+                                PlayerAction::Call
+                            } else {
+                                PlayerAction::Raise(active_player.chips - call_amt)
+                            }
                         } else if let Ok(amt) = amt_trim.parse::<u32>() {
                             PlayerAction::Raise(amt)
                         } else {
