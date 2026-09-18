@@ -11,9 +11,14 @@ use crate::event_logger::process_events;
 pub fn play_local(i18n: &I18n) {
     let mut game = GameState::new();
 
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let is_third_aggressive = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() % 2 == 0;
+    let bot3_id = if is_third_aggressive { 4 } else { 3 }; // 4 = Aggressive, 3 = Conservative
+
     game.players.push(Player::new(0, i18n.t("human_name").to_string(), 1000));
-    game.players.push(Player::new(1, i18n.t("bot2_name").to_string(), 1000));
-    game.players.push(Player::new(2, i18n.t("bot1_name").to_string(), 1000));
+    game.players.push(Player::new(1, "Bot Alice".to_string(), 1000));
+    game.players.push(Player::new(2, "Bot Bob".to_string(), 1000));
+    game.players.push(Player::new(bot3_id, "Bot Charlie".to_string(), 1000));
 
     loop {
         print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
@@ -159,15 +164,15 @@ fn handle_human_turn(game: &GameState, active_chips: u32, active_bet: u32, i18n:
 
 fn handle_bot_turn(
     game: &GameState,
-    _active_id: usize,
+    active_id: usize,
     active_chips: u32,
     active_bet: u32,
-    active_name: &str,
+    _active_name: &str,
     active_hole_cards: &[engine::card::Card],
     num_opponents: usize,
 ) -> PlayerAction {
     let amount_to_call = game.current_highest_bet - active_bet;
-    let is_aggressive = active_name.contains("Agressivo") || active_name.contains("Aggressive");
+    let is_aggressive = active_id % 2 == 0;
     
     let win_rate = if num_opponents > 0 {
         engine::ai::calculate_win_rate(
