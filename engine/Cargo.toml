@@ -7,3 +7,4 @@ edition = "2024"
 itertools = "0.15.0"
 rand = "0.10.2"
 serde = { version = "1.0.229", features = ["derive"] }
+rayon = "1.10"
