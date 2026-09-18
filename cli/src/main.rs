@@ -111,7 +111,26 @@ fn main() {
                     "1" => PlayerAction::Fold,
                     "2" => PlayerAction::Check,
                     "3" => PlayerAction::Call,
-                    "4" => PlayerAction::Raise(50),
+                    "4" => {
+                        print!("{}", i18n.t("raise_prompt"));
+                        let _ = io::stdout().flush();
+                        let mut amt_input = String::new();
+                        let _ = io::stdin().read_line(&mut amt_input);
+                        
+                        let amt_trim = amt_input.trim().to_lowercase();
+                        if amt_trim == "all" {
+                            PlayerAction::Raise(active_player.chips)
+                        } else if let Ok(amt) = amt_trim.parse::<u32>() {
+                            PlayerAction::Raise(amt)
+                        } else {
+                            action_log.push(i18n.t("invalid_amt").to_string());
+                            if game.current_highest_bet > active_player.current_bet {
+                                PlayerAction::Fold
+                            } else {
+                                PlayerAction::Check
+                            }
+                        }
+                    },
                     _ => {
                         action_log.push(i18n.t("unknown_cmd").to_string());
                         if game.current_highest_bet > active_player.current_bet {
