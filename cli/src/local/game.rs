@@ -25,6 +25,8 @@ pub fn play_local(i18n: &I18n) {
         println!("\n\n--------------------------------------");
         println!("              {}                ", i18n.t("new_hand"));
         println!("--------------------------------------");
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+        std::thread::sleep(std::time::Duration::from_millis(1500));
 
         let mut action_log: Vec<String> = Vec::new();
 
