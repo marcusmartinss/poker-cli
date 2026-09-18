@@ -56,11 +56,8 @@ pub fn play_local(i18n: &I18n) {
                 println!("{}\n", i18n.t("your_turn"));
                 
                 if active_hole_cards.len() == 2 {
-                    println!("{}", i18n.t("your_cards"));
-                    ui::draw_cards_ascii(&active_hole_cards, false);
-                    
                     let mut my_cards = game.community_cards.clone();
-                    my_cards.extend(active_hole_cards);
+                    my_cards.extend(active_hole_cards.clone());
                     
                     let raw_hand = if my_cards.len() == 2 {
                         if my_cards[0].rank == my_cards[1].rank {
@@ -75,13 +72,14 @@ pub fn play_local(i18n: &I18n) {
                         }
                     };
                     
-                    println!(" - {}", i18n.t_hand(&raw_hand));
+                    println!("{} ({})", i18n.t("your_cards"), i18n.t_hand(&raw_hand));
+                    ui::draw_cards_ascii(&active_hole_cards, false);
                 }
 
                 if let Some(action) = handle_human_turn(&game, active_chips, active_bet, &i18n) {
                     match game.process_action(active_id, action) {
                         Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
-                        Err(e) => println!("{} {}", i18n.t("invalid_move"), i18n.t(e)),
+                        Err(e) => action_log.push(format!("{} {}", i18n.t("invalid_move"), i18n.t(e))),
                     }
                 }
             } else {
