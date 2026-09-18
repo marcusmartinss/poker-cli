@@ -289,7 +289,7 @@ fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<String>,
             GameEvent::PotAwarded(id, amount, hand_desc) => {
                 let name = game.players.iter().find(|p| p.id == *id).map(|p| p.name.as_str()).unwrap_or("Unknown");
                 let local_hand = i18n.t_hand(hand_desc);
-                log.push(format!("🏆 {} {} {} {} {}! 🏆", name, i18n.t("won"), amount, i18n.t("chips_with"), local_hand.to_uppercase()));
+                log.push(format!("*** {} {} {} {} {}! ***", name, i18n.t("won"), amount, i18n.t("chips_with"), local_hand.to_uppercase()));
             }
             _ => {}
         }
