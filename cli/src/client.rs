@@ -220,9 +220,12 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                     
                     print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
                     crate::ui::render_table(i18n, &state);
-                    crate::ui::render_showdown(i18n, &state);
                     
-                    println!("  {}", i18n.t("final_actions"));
+                    if state.phase == engine::event::GamePhase::Showdown || state.phase == engine::event::GamePhase::Finished {
+                        crate::ui::render_showdown(i18n, &state);
+                    }
+                    
+                    println!("  [ {} ]", i18n.t("final_actions"));
                     let recent = if action_log.len() > 8 { &action_log[action_log.len()-8..] } else { &action_log[..] };
                     for msg in recent {
                         println!("   > {}", msg);
@@ -231,17 +234,29 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                     
                     if state.phase == engine::event::GamePhase::Finished {
                         println!("Hand Finished. Waiting for Host/Server to continue...");
-                    } else {
+                    } else if state.phase != engine::event::GamePhase::Showdown {
+                        // Display my cards if I'm not folded and not finished
+                        if let Some(me) = state.players.iter().find(|p| p.id == my_id) {
+                            if me.hole_cards.len() == 2 {
+                                let mut my_cards = state.community_cards.clone();
+                                my_cards.extend(me.hole_cards.clone());
+                                let raw_hand = if my_cards.len() == 2 {
+                                    if my_cards[0].rank == my_cards[1].rank { "Pair".to_string() } else { "HighCard".to_string() }
+                                } else {
+                                    match engine::evaluator::evaluate(&my_cards) {
+                                        Ok(rank) => format!("{:?}", rank),
+                                        Err(_) => "".to_string(),
+                                    }
+                                };
+                                println!("  {} ( {} )", i18n.t("your_cards"), i18n.t_hand(&raw_hand));
+                                crate::ui::draw_cards_ascii(&me.hole_cards, false);
+                                println!();
+                            }
+                        }
+
                         // Check if it's my turn
                         if state.current_turn < state.players.len() && state.players[state.current_turn].id == my_id {
                             println!("{}", i18n.t("your_turn"));
-                            if state.players[state.current_turn].hole_cards.len() == 2 {
-                                println!("{}", i18n.t("your_cards"));
-                                let rank = engine::evaluator::evaluate(&state.players[state.current_turn].hole_cards).unwrap_or(
-                                    engine::evaluator::HandRank::HighCard([engine::card::Rank::Two; 5])
-                                );
-                                println!(" - {}", i18n.t_hand(&format!("{:?}", rank)));
-                            }
                             println!("{}", i18n.t("actions_menu"));
                             print!("{}", i18n.t("action_prompt"));
                             let _ = io::stdout().flush();
