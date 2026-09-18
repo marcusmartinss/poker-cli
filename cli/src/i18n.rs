@@ -62,6 +62,9 @@ impl I18n {
                 "Not enough chips to raise that amount." => "Not enough chips to raise that amount.",
                 "win_prob" => "Win Probability:",
                 "current_hand" => "Current Hand:",
+                "you_lost" => "You lost all your chips!",
+                "player_busted" => "A player was eliminated!",
+                "you_won_game" => "You eliminated everyone and WON THE GAME!",
                 _ => "???",
             },
             Language::Portuguese => match key {
@@ -109,6 +112,9 @@ impl I18n {
                 "Not enough chips to raise that amount." => "Fichas insuficientes para aumentar esse valor.",
                 "win_prob" => "Probabilidade de Vitória:",
                 "current_hand" => "Mão Atual:",
+                "you_lost" => "Você perdeu todas as suas fichas!",
+                "player_busted" => "Um jogador foi eliminado da mesa!",
+                "you_won_game" => "Você eliminou todos os bots e VENCEU O JOGO!",
                 _ => "???",
             },
         }

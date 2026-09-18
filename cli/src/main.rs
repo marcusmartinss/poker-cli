@@ -94,7 +94,7 @@ fn main() {
                     };
 
                     if !raw_hand.is_empty() {
-                        println!("  {}: {}\n", i18n.t("current_hand"), i18n.t_hand(&raw_hand));
+                        println!("  {} {}\n", i18n.t("current_hand"), i18n.t_hand(&raw_hand));
                     }
                 }
 
@@ -201,6 +201,29 @@ fn main() {
         }
         println!("---------------------------------------------------------\n");
 
+        if let Some(human) = game.players.iter().find(|p| p.id == 0) {
+            if human.chips == 0 {
+                println!("\n  >>> GAME OVER! {} <<<", i18n.t("you_lost"));
+                break;
+            }
+        } else {
+            println!("\n  >>> GAME OVER! {} <<<", i18n.t("you_lost"));
+            break;
+        }
+
+        let old_count = game.players.len();
+        game.players.retain(|p| p.chips > 0);
+        let new_count = game.players.len();
+
+        if old_count > new_count {
+            println!("  >>> {} <<<", i18n.t("player_busted"));
+        }
+
+        if game.players.len() == 1 {
+            println!("\n  >>> PARABÉNS! {} <<<", i18n.t("you_won_game"));
+            break;
+        }
+
         println!("\n{}", i18n.t("press_enter"));
         let _ = io::stdout().flush();
         let mut _input = String::new();
@@ -224,7 +247,7 @@ fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<String>,
                 log.push(format!("{} {}", i18n.t("dealer_revealed"), cards_str));
             }
             GameEvent::PlayerActed(id, action) => {
-                let name = &game.players[*id].name;
+                let name = game.players.iter().find(|p| p.id == *id).map(|p| p.name.as_str()).unwrap_or("Unknown");
                 match action {
                     PlayerAction::Fold => log.push(format!("{} {}", name, i18n.t("folded_action"))),
                     PlayerAction::Check => log.push(format!("{} {}", name, i18n.t("checked_action"))),
@@ -233,7 +256,7 @@ fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<String>,
                 }
             }
             GameEvent::PotAwarded(id, amount, hand_desc) => {
-                let name = &game.players[*id].name;
+                let name = game.players.iter().find(|p| p.id == *id).map(|p| p.name.as_str()).unwrap_or("Unknown");
                 let local_hand = i18n.t_hand(hand_desc);
                 log.push(format!("🏆 {} {} {} {} {}! 🏆", name, i18n.t("won"), amount, i18n.t("chips_with"), local_hand.to_uppercase()));
             }
