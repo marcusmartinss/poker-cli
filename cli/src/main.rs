@@ -77,14 +77,24 @@ fn main() {
                     println!("{}", i18n.t("your_cards"));
                     ui::draw_cards_ascii(&active_player.hole_cards, false);
                     
-                    if num_opponents > 0 {
-                        let win_rate = engine::ai::calculate_win_rate(
-                            &active_player.hole_cards,
-                            &game.community_cards,
-                            num_opponents,
-                            2000,
-                        );
-                        println!("  {} {:.1}%\n", i18n.t("win_prob"), win_rate * 100.0);
+                    let mut my_cards = game.community_cards.clone();
+                    my_cards.extend(active_player.hole_cards.clone());
+                    
+                    let raw_hand = if my_cards.len() == 2 {
+                        if my_cards[0].rank == my_cards[1].rank {
+                            "Pair".to_string()
+                        } else {
+                            "HighCard".to_string()
+                        }
+                    } else {
+                        match engine::evaluator::evaluate(&my_cards) {
+                            Ok(rank) => format!("{:?}", rank),
+                            Err(_) => "".to_string(),
+                        }
+                    };
+
+                    if !raw_hand.is_empty() {
+                        println!("  {}: {}\n", i18n.t("current_hand"), i18n.t_hand(&raw_hand));
                     }
                 }
 
