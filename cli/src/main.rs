@@ -102,40 +102,8 @@ fn main() {
                 print!("{}", i18n.t("action_prompt"));
                 let _ = io::stdout().flush();
                 
-                let mut input = String::new();
-                if let Err(_) = io::stdin().read_line(&mut input) {
-                    break;
-                }
-
-                let action = match input.trim() {
-                    "1" => PlayerAction::Fold,
-                    "2" => PlayerAction::Check,
-                    "3" => PlayerAction::Call,
-                    "4" => {
-                        print!("{}", i18n.t("raise_prompt"));
-                        let _ = io::stdout().flush();
-                        let mut amt_input = String::new();
-                        let _ = io::stdin().read_line(&mut amt_input);
-                        
-                        let amt_trim = amt_input.trim().to_lowercase();
-                        let call_amt = game.current_highest_bet - active_player.current_bet;
-                        if amt_trim == "all" {
-                            if active_player.chips <= call_amt {
-                                PlayerAction::Call
-                            } else {
-                                PlayerAction::Raise(active_player.chips - call_amt)
-                            }
-                        } else if let Ok(amt) = amt_trim.parse::<u32>() {
-                            PlayerAction::Raise(amt)
-                        } else {
-                            action_log.push(i18n.t("invalid_amt").to_string());
-                            continue;
-                        }
-                    },
-                    _ => {
-                        action_log.push(i18n.t("unknown_cmd").to_string());
-                        continue;
-                    }
+                let Some(action) = handle_human_turn(&game, active_player, &i18n, &mut action_log) else {
+                    continue;
                 };
 
                 match game.process_action(active_player.id, action) {
@@ -143,61 +111,13 @@ fn main() {
                     Err(e) => action_log.push(format!("{} {}", i18n.t("invalid_move"), i18n.t(e))),
                 }
             } else {
-                let amount_to_call = game.current_highest_bet - active_player.current_bet;
                 let active_id = active_player.id;
-                let active_chips = active_player.chips;
-                let is_aggressive = active_player.name.contains("Agressivo") || active_player.name.contains("Aggressive");
-                
-                let win_rate = if num_opponents > 0 {
-                    engine::ai::calculate_win_rate(
-                        &active_player.hole_cards,
-                        &game.community_cards,
-                        num_opponents,
-                        2000,
-                    )
-                } else {
-                    1.0
-                };
-                
-                let base_win_rate = 1.0 / (num_opponents as f64 + 1.0);
-                
-                let (raise_threshold, call_threshold) = if is_aggressive {
-                    (base_win_rate + 0.05, base_win_rate - 0.15)
-                } else {
-                    (base_win_rate + 0.15, base_win_rate - 0.05)
-                };
-
-                let raise_amount = if is_aggressive { 150 } else { 50 };
-                let total_raise_cost = amount_to_call + raise_amount;
-
-                // Smart AI Decisions based on Monte Carlo Win Probability and Personalities
-                let action = if win_rate > raise_threshold {
-                    if active_chips >= total_raise_cost {
-                        PlayerAction::Raise(raise_amount)
-                    } else if amount_to_call > 0 {
-                        PlayerAction::Call
-                    } else {
-                        PlayerAction::Check
-                    }
-                } else if win_rate > call_threshold {
-                    if amount_to_call > 0 {
-                        PlayerAction::Call
-                    } else {
-                        PlayerAction::Check
-                    }
-                } else {
-                    if amount_to_call > 0 {
-                        PlayerAction::Fold
-                    } else {
-                        PlayerAction::Check
-                    }
-                };
+                let action = handle_bot_turn(&game, active_player, num_opponents);
                 
                 match game.process_action(active_id, action) {
                     Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
                     Err(_) => {
-                        // Silent fallback just in case, so we never pollute the UI with Bot mistakes
-                        let fallback_action = if amount_to_call > 0 {
+                        let fallback_action = if game.current_highest_bet > game.players.iter().find(|p| p.id == active_id).unwrap().current_bet {
                             PlayerAction::Call
                         } else {
                             PlayerAction::Check
@@ -205,7 +125,6 @@ fn main() {
                         if let Ok(events) = game.process_action(active_id, fallback_action) {
                             process_events(&events, &game, &mut action_log, &i18n);
                         } else {
-                            // Ultimate fallback
                             let _ = game.process_action(active_id, PlayerAction::Fold);
                         }
                     }
@@ -223,36 +142,126 @@ fn main() {
         }
         println!("---------------------------------------------------------\n");
 
-        if let Some(human) = game.players.iter().find(|p| p.id == 0) {
-            if human.chips == 0 {
-                println!("\n  >>> GAME OVER! {} <<<", i18n.t("you_lost"));
-                break;
-            }
-        } else {
-            println!("\n  >>> GAME OVER! {} <<<", i18n.t("you_lost"));
+        if handle_end_of_hand(&mut game, &i18n) {
             break;
         }
-
-        let old_count = game.players.len();
-        game.players.retain(|p| p.chips > 0);
-        let new_count = game.players.len();
-
-        if old_count > new_count {
-            println!("  >>> {} <<<", i18n.t("player_busted"));
-        }
-
-        if game.players.len() == 1 {
-            println!("\n  >>> PARABÉNS! {} <<<", i18n.t("you_won_game"));
-            break;
-        }
-
-        println!("\n{}", i18n.t("press_enter"));
-        let _ = io::stdout().flush();
-        let mut _input = String::new();
-        let _ = io::stdin().read_line(&mut _input);
-
-        game.dealer_button = (game.dealer_button + 1) % game.players.len();
     }
+}
+
+fn handle_human_turn(
+    game: &GameState,
+    active_player: &engine::player::Player,
+    i18n: &I18n,
+    action_log: &mut Vec<String>,
+) -> Option<PlayerAction> {
+    let mut input = String::new();
+    let _ = io::stdin().read_line(&mut input);
+
+    match input.trim() {
+        "1" => Some(PlayerAction::Fold),
+        "2" => Some(PlayerAction::Check),
+        "3" => Some(PlayerAction::Call),
+        "4" => {
+            print!("{}", i18n.t("raise_prompt"));
+            let _ = io::stdout().flush();
+            let mut amt_input = String::new();
+            let _ = io::stdin().read_line(&mut amt_input);
+            
+            let amt_trim = amt_input.trim().to_lowercase();
+            let call_amt = game.current_highest_bet - active_player.current_bet;
+            if amt_trim == "all" {
+                if active_player.chips <= call_amt {
+                    Some(PlayerAction::Call)
+                } else {
+                    Some(PlayerAction::Raise(active_player.chips - call_amt))
+                }
+            } else if let Ok(amt) = amt_trim.parse::<u32>() {
+                Some(PlayerAction::Raise(amt))
+            } else {
+                action_log.push(i18n.t("invalid_amt").to_string());
+                None
+            }
+        },
+        _ => {
+            action_log.push(i18n.t("unknown_cmd").to_string());
+            None
+        }
+    }
+}
+
+fn handle_bot_turn(
+    game: &GameState,
+    active_player: &engine::player::Player,
+    num_opponents: usize,
+) -> PlayerAction {
+    let amount_to_call = game.current_highest_bet - active_player.current_bet;
+    let active_chips = active_player.chips;
+    let is_aggressive = active_player.name.contains("Agressivo") || active_player.name.contains("Aggressive");
+    
+    let win_rate = if num_opponents > 0 {
+        engine::ai::calculate_win_rate(
+            &active_player.hole_cards,
+            &game.community_cards,
+            num_opponents,
+            2000,
+        )
+    } else {
+        1.0
+    };
+    
+    let base_win_rate = 1.0 / (num_opponents as f64 + 1.0);
+    
+    let (raise_threshold, call_threshold) = if is_aggressive {
+        (base_win_rate + 0.05, base_win_rate - 0.15)
+    } else {
+        (base_win_rate + 0.15, base_win_rate - 0.05)
+    };
+
+    let raise_amount = if is_aggressive { 150 } else { 50 };
+    let total_raise_cost = amount_to_call + raise_amount;
+
+    if win_rate > raise_threshold && active_chips >= total_raise_cost {
+        PlayerAction::Raise(raise_amount)
+    } else if amount_to_call == 0 {
+        PlayerAction::Check
+    } else if win_rate > call_threshold {
+        PlayerAction::Call
+    } else {
+        PlayerAction::Fold
+    }
+}
+
+fn handle_end_of_hand(game: &mut GameState, i18n: &I18n) -> bool {
+    if let Some(human) = game.players.iter().find(|p| p.id == 0) {
+        if human.chips == 0 {
+            println!("\n  >>> GAME OVER! {} <<<", i18n.t("you_lost"));
+            return true;
+        }
+    } else {
+        println!("\n  >>> GAME OVER! {} <<<", i18n.t("you_lost"));
+        return true;
+    }
+
+    let old_count = game.players.len();
+    game.players.retain(|p| p.chips > 0);
+    let new_count = game.players.len();
+
+    if old_count > new_count {
+        println!("  >>> {} <<<", i18n.t("player_busted"));
+    }
+
+    if game.players.len() == 1 {
+        println!("\n  >>> PARABÉNS! {} <<<", i18n.t("you_won_game"));
+        return true;
+    }
+
+    println!("\n{}", i18n.t("press_enter"));
+    let _ = io::stdout().flush();
+    let mut _input = String::new();
+    let _ = io::stdin().read_line(&mut _input);
+
+    game.dealer_button = (game.dealer_button + 1) % game.players.len();
+    false
 }
 
 fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<String>, i18n: &I18n) {
