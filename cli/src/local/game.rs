@@ -81,7 +81,7 @@ pub fn play_local(i18n: &I18n) {
                 if let Some(action) = handle_human_turn(&game, active_chips, active_bet, &i18n) {
                     match game.process_action(active_id, action) {
                         Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
-                        Err(e) => println!("{} {}", i18n.t("invalid_action"), e),
+                        Err(e) => println!("{} {}", i18n.t("invalid_move"), i18n.t(e)),
                     }
                 }
             } else {

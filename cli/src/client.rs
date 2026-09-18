@@ -193,10 +193,18 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
         if let Ok(msg) = server_rx.try_recv() {
             match msg {
                 ServerMessage::Error(e) => {
-                    println!("[ERROR] {}", e);
+                    println!("[ERROR] {}", i18n.t(&e));
                     if matches!(mode, InputMode::Name) {
                         print!("Try another name: ");
                         let _ = io::stdout().flush();
+                    } else if matches!(mode, InputMode::GamePlay) || matches!(mode, InputMode::GamePlayRaising) {
+                        if let Some(game) = &game_state_opt {
+                            if game.players[game.current_turn].id == my_id {
+                                print!("{}\n{esc}[0m", i18n.t("actions_menu"), esc = 27 as char);
+                                print!("{}", i18n.t("action_prompt"));
+                                let _ = io::stdout().flush();
+                            }
+                        }
                     }
                 }
                 ServerMessage::Welcome { player_id } => {
