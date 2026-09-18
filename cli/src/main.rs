@@ -182,40 +182,39 @@ fn main() {
                 let action = if win_rate > raise_threshold {
                     if active_chips >= total_raise_cost {
                         PlayerAction::Raise(raise_amount)
-                    } else if amount_to_call > 0 && amount_to_call <= active_chips {
+                    } else if amount_to_call > 0 {
                         PlayerAction::Call
                     } else {
                         PlayerAction::Check
                     }
                 } else if win_rate > call_threshold {
-                    if amount_to_call == 0 {
-                        PlayerAction::Check
-                    } else if amount_to_call <= active_chips {
+                    if amount_to_call > 0 {
                         PlayerAction::Call
                     } else {
-                        PlayerAction::Fold
+                        PlayerAction::Check
                     }
                 } else {
-                    if amount_to_call == 0 {
-                        PlayerAction::Check
-                    } else {
+                    if amount_to_call > 0 {
                         PlayerAction::Fold
+                    } else {
+                        PlayerAction::Check
                     }
                 };
                 
                 match game.process_action(active_id, action) {
                     Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
-                    Err(e) => {
-                        action_log.push(format!("{} {}", i18n.t("bot_invalid_move"), i18n.t(e)));
-                        let fallback_action = if amount_to_call > 0 && amount_to_call <= active_chips {
+                    Err(_) => {
+                        // Silent fallback just in case, so we never pollute the UI with Bot mistakes
+                        let fallback_action = if amount_to_call > 0 {
                             PlayerAction::Call
-                        } else if amount_to_call == 0 {
-                            PlayerAction::Check
                         } else {
-                            PlayerAction::Fold
+                            PlayerAction::Check
                         };
                         if let Ok(events) = game.process_action(active_id, fallback_action) {
                             process_events(&events, &game, &mut action_log, &i18n);
+                        } else {
+                            // Ultimate fallback
+                            let _ = game.process_action(active_id, PlayerAction::Fold);
                         }
                     }
                 }
