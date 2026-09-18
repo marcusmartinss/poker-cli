@@ -26,5 +26,5 @@ pub enum GameEvent {
     PhaseChanged(GamePhase),
     CommunityCardsRevealed(Vec<Card>),
     PlayerActed(usize, PlayerAction),
-    PotAwarded(usize, u32),
+    PotAwarded(usize, u32, String), // id, amount, hand_name
 }

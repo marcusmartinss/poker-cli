@@ -1,0 +1,115 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Language {
+    English,
+    Portuguese,
+}
+
+pub struct I18n {
+    pub lang: Language,
+}
+
+impl I18n {
+    pub fn new(lang: Language) -> Self {
+        Self { lang }
+    }
+
+    pub fn t(&self, key: &str) -> &'static str {
+        match self.lang {
+            Language::English => match key {
+                "app_title" => "TERMINAL TEXAS HOLD'EM ♠♥♦♣",
+                "new_hand" => "NEW HAND",
+                "pot" => "POT",
+                "highest_bet" => "HIGHEST BET",
+                "board_cards" => "BOARD CARDS:",
+                "players" => "PLAYERS:",
+                "folded" => "(FOLDED)",
+                "all_in" => "(ALL-IN)",
+                "bet" => "Bet",
+                "recent_actions" => "[ RECENT ACTIONS ]",
+                "your_turn" => "Your turn",
+                "your_cards" => "Your Hole Cards:",
+                "actions_menu" => "Actions: [1] Fold | [2] Check | [3] Call | [4] Raise (50 chips)",
+                "action_prompt" => "Action: ",
+                "unknown_cmd" => "You entered an unknown command. Defaulting to Check/Fold.",
+                "invalid_move" => "[WARNING] Invalid move:",
+                "bot_invalid_move" => "[WARNING] Bot invalid move:",
+                "showdown_reveal" => "SHOWDOWN REVEAL",
+                "folded_end" => "FOLDED.",
+                "cards_end" => "CARDS:",
+                "final_actions" => "[ FINAL ACTIONS ]",
+                "press_enter" => "Press [Enter] to play the next hand or [Ctrl+C] to exit...",
+                "dealer_dealing" => "The dealer is dealing hole cards...",
+                "dealer_revealed" => "Dealer revealed:",
+                "folded_action" => "folded.",
+                "checked_action" => "checked.",
+                "called_action" => "called.",
+                "raised_by" => "RAISED by",
+                "won" => "WON",
+                "chips_with" => "CHIPS WITH",
+                "error_start" => "Error starting game:",
+                "phase" => "PHASE",
+                "human_name" => "You (Human)",
+                "bot1_name" => "Conservative Bot",
+                "bot2_name" => "Aggressive Bot",
+                _ => "???",
+            },
+            Language::Portuguese => match key {
+                "app_title" => "TEXAS HOLD'EM NO TERMINAL ♠♥♦♣",
+                "new_hand" => "NOVA MÃO",
+                "pot" => "POTE",
+                "highest_bet" => "MAIOR APOSTA",
+                "board_cards" => "CARTAS DA MESA:",
+                "players" => "JOGADORES:",
+                "folded" => "(CORREU)",
+                "all_in" => "(TUDO-OU-NADA)",
+                "bet" => "Aposta",
+                "recent_actions" => "[ ÚLTIMAS AÇÕES ]",
+                "your_turn" => "Sua vez",
+                "your_cards" => "Suas Cartas:",
+                "actions_menu" => "Ações: [1] Correr | [2] Mesa | [3] Pagar | [4] Aumentar (50 fichas)",
+                "action_prompt" => "Ação: ",
+                "unknown_cmd" => "Comando desconhecido. Assumindo Mesa/Correr.",
+                "invalid_move" => "[AVISO] Movimento inválido:",
+                "bot_invalid_move" => "[AVISO] Bot tentou movimento inválido:",
+                "showdown_reveal" => "REVELAÇÃO DO SHOWDOWN",
+                "folded_end" => "CORREU.",
+                "cards_end" => "CARTAS:",
+                "final_actions" => "[ AÇÕES FINAIS ]",
+                "press_enter" => "Pressione [Enter] para a próxima mão ou [Ctrl+C] para sair...",
+                "dealer_dealing" => "O dealer está distribuindo as cartas...",
+                "dealer_revealed" => "Dealer revelou:",
+                "folded_action" => "correu.",
+                "checked_action" => "deu mesa.",
+                "called_action" => "pagou a aposta.",
+                "raised_by" => "AUMENTOU em",
+                "won" => "VENCEU",
+                "chips_with" => "FICHAS COM",
+                "error_start" => "Erro ao iniciar jogo:",
+                "phase" => "FASE",
+                "human_name" => "Você (Humano)",
+                "bot1_name" => "Bot Conservador",
+                "bot2_name" => "Bot Agressivo",
+                _ => "???",
+            },
+        }
+    }
+
+    pub fn t_hand(&self, hand_desc: &str) -> String {
+        if self.lang == Language::English {
+            return hand_desc.to_string();
+        }
+        
+        let h = hand_desc.to_lowercase();
+        if h.contains("highcard") { "Carta Alta".to_string() }
+        else if h.contains("twopair") { "Dois Pares".to_string() }
+        else if h.contains("pair") { "Um Par".to_string() }
+        else if h.contains("threeofakind") { "Trinca".to_string() }
+        else if h.contains("straightflush") { "Straight Flush".to_string() }
+        else if h.contains("straight") { "Sequência".to_string() }
+        else if h.contains("flush") { "Flush".to_string() }
+        else if h.contains("fullhouse") { "Full House".to_string() }
+        else if h.contains("fourofakind") { "Quadra".to_string() }
+        else if h.contains("royalflush") { "Royal Flush".to_string() }
+        else { hand_desc.to_string() }
+    }
+}

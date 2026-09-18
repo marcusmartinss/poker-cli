@@ -53,7 +53,16 @@ impl GameState {
             if let Some(c2) = self.deck.draw() { player.hole_cards.push(c2); }
         }
 
-        self.current_turn = (self.dealer_button + 1) % self.players.len();
+        // Apply Blinds
+        let sb_index = (self.dealer_button + 1) % self.players.len();
+        let bb_index = (self.dealer_button + 2) % self.players.len();
+        
+        self.apply_forced_bet(sb_index, 10);
+        self.apply_forced_bet(bb_index, 20);
+        self.current_highest_bet = 20;
+
+        // Turn starts with the player after the Big Blind (UTG)
+        self.current_turn = (self.dealer_button + 3) % self.players.len();
 
         Ok(vec![GameEvent::GameStarted, GameEvent::PhaseChanged(self.phase)])
     }
@@ -85,6 +94,15 @@ impl GameState {
         }
 
         Ok(events)
+    }
+
+    fn apply_forced_bet(&mut self, player_index: usize, amount: u32) {
+        let p = &mut self.players[player_index];
+        let actual = amount.min(p.chips);
+        p.chips -= actual;
+        p.current_bet += actual;
+        self.pot += actual;
+        if p.chips == 0 { p.is_all_in = true; }
     }
 
     fn apply_action(&mut self, player_index: usize, action: &PlayerAction) -> Result<(), &'static str> {
@@ -174,14 +192,66 @@ impl GameState {
                 self.deal_community_cards(1, events);
             }
             GamePhase::River => {
-                self.phase = GamePhase::Showdown;
-                events.push(GameEvent::PhaseChanged(self.phase));
+                self.handle_showdown(events);
+                return;
             }
             _ => {}
         }
         
+        // After dealing cards, the first active player left of the dealer acts
         self.current_turn = self.dealer_button;
         self.advance_turn();
+    }
+
+    fn handle_showdown(&mut self, events: &mut Vec<GameEvent>) {
+        self.phase = GamePhase::Showdown;
+        events.push(GameEvent::PhaseChanged(self.phase));
+
+        let mut best_rank: Option<crate::evaluator::HandRank> = None;
+        let mut winners: Vec<usize> = Vec::new();
+
+        for (i, p) in self.players.iter().enumerate() {
+            if p.is_folded {
+                continue;
+            }
+
+            let mut all_cards = self.community_cards.clone();
+            all_cards.extend(p.hole_cards.clone());
+
+            if let Ok(rank) = crate::evaluator::evaluate(&all_cards) {
+                match best_rank {
+                    None => {
+                        best_rank = Some(rank);
+                        winners.push(i);
+                    }
+                    Some(ref best) => {
+                        if rank > *best {
+                            best_rank = Some(rank);
+                            winners.clear();
+                            winners.push(i);
+                        } else if rank == *best {
+                            winners.push(i);
+                        }
+                    }
+                }
+            }
+        }
+
+        if !winners.is_empty() {
+            let split_amount = self.pot / winners.len() as u32;
+            let hand_desc = match &best_rank {
+                Some(r) => format!("{:?}", r),
+                None => "Unknown".to_string(),
+            };
+            
+            for &idx in &winners {
+                self.players[idx].chips += split_amount;
+                events.push(GameEvent::PotAwarded(self.players[idx].id, split_amount, hand_desc.clone()));
+            }
+        }
+
+        self.phase = GamePhase::Finished;
+        events.push(GameEvent::PhaseChanged(self.phase));
     }
 
     fn deal_community_cards(&mut self, count: usize, events: &mut Vec<GameEvent>) {
@@ -206,7 +276,7 @@ impl GameState {
         
         if let Some(winner) = self.players.iter_mut().find(|p| !p.is_folded) {
             winner.chips += self.pot;
-            events.push(GameEvent::PotAwarded(winner.id, self.pot));
+            events.push(GameEvent::PotAwarded(winner.id, self.pot, "Everyone else folded".to_string()));
         }
     }
 }

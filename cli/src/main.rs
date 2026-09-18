@@ -1,104 +1,172 @@
-use engine::deck::Deck;
-use engine::evaluator::evaluate;
+mod ui;
+mod i18n;
+
+use engine::event::{GameEvent, GamePhase, PlayerAction};
+use engine::state::GameState;
 use std::io::{self, Write};
+use i18n::{I18n, Language};
+
+fn get_language() -> Language {
+    print!("{}[2J{}[1;1H", 27 as char, 27 as char);
+    println!("Welcome to Terminal Texas Hold'em!");
+    println!("Select Language / Selecione o Idioma:");
+    println!("[1] English");
+    println!("[2] Português");
+    print!("> ");
+    let _ = io::stdout().flush();
+    
+    let mut input = String::new();
+    let _ = io::stdin().read_line(&mut input);
+    
+    if input.trim() == "2" {
+        Language::Portuguese
+    } else {
+        Language::English
+    }
+}
 
 fn main() {
-    println!("♠♥♦♣ TESTE ♠♥♦♣");
+    let lang = get_language();
+    let i18n = I18n::new(lang);
 
-    let mut deck = Deck::new();
-    let mut table_cards = Vec::new();
+    println!("======================================");
+    println!("      {}     ", i18n.t("app_title"));
+    println!("======================================");
+
+    let mut game = GameState::new();
+    
+    game.add_player(0, i18n.t("human_name").to_string(), 1000);
+    game.add_player(1, i18n.t("bot1_name").to_string(), 1000);
+    game.add_player(2, i18n.t("bot2_name").to_string(), 1000);
 
     loop {
-        println!("\n==================================");
-        println!("ESTADO ATUAL:");
-        println!("- Cartas restantes no baralho: {}", deck.remaining_cards());
-        println!("- Cartas na mesa (sua mão): {}", table_cards.len());
-        println!("==================================");
-        
-        println!("1. Criar novo baralho de 52 cartas (Reset)");
-        println!("2. Embaralhar o baralho atual");
-        println!("3. Sacar 1 carta do topo");
-        println!("4. Sacar X cartas do topo");
-        println!("5. Avaliar as cartas que estão na mesa");
-        println!("6. Limpar a mesa (jogar cartas fora)");
-        println!("0. Sair");
-        print!("\nEscolha uma opção: ");
-        let _ = io::stdout().flush();
+        println!("\n\n--------------------------------------");
+        println!("              {}                ", i18n.t("new_hand"));
+        println!("--------------------------------------");
 
-        let mut input = String::new();
-        if let Err(e) = io::stdin().read_line(&mut input) {
-            println!(">> [ERRO CRÍTICO] Falha ao ler a entrada do terminal: {}", e);
-            break;
-        }
-        let choice = input.trim();
+        let mut action_log: Vec<String> = Vec::new();
 
-        match choice {
-            "1" => {
-                deck = Deck::new();
-                table_cards.clear();
-                println!(">> Novo baralho de 52 cartas gerado na ordem original.");
-            }
-            "2" => {
-                deck.shuffle();
-                println!(">> Baralho embaralhado criptograficamente!");
-            }
-            "3" => {
-                match deck.draw() {
-                    Some(card) => {
-                        println!(">> Você sacou: {}", card);
-                        table_cards.push(card);
-                    }
-                    None => {
-                        println!(">> [ALERTA] O baralho acabou! Não é possível sacar mais cartas.");
-                    }
-                }
-            }
-            "4" => {
-                print!("Quantas cartas quer sacar? ");
-                let _ = io::stdout().flush();
-                let mut amount_str = String::new();
-                if let Err(e) = io::stdin().read_line(&mut amount_str) {
-                    println!(">> [ERRO] Falha ao ler a quantidade: {}", e);
-                    continue;
-                }
-                
-                if let Ok(amount) = amount_str.trim().parse::<usize>() {
-                    let mut drawn = 0;
-                    for _ in 0..amount {
-                        if let Some(card) = deck.draw() {
-                            table_cards.push(card);
-                            drawn += 1;
-                        } else {
-                            println!(">> [ALERTA] O baralho secou no meio do caminho! Apenas {} cartas foram sacadas.", drawn);
-                            break;
-                        }
-                    }
-                    println!(">> {} cartas adicionadas à mesa.", drawn);
-                } else {
-                    println!(">> [ERRO] Número inválido.");
-                }
-            }
-            "5" => {
-                println!(">> Cartas sendo avaliadas:");
-                for c in &table_cards {
-                    println!("    - {}", c);
-                }
-                match evaluate(&table_cards) {
-                    Ok(hand_rank) => println!(">> RESULTADO DO MOTOR: {:#?}", hand_rank),
-                    Err(err) => println!(">> [ERRO] O motor recusou a avaliação: {}", err),
-                }
-            }
-            "6" => {
-                table_cards.clear();
-                println!(">> A mesa foi limpa. (As cartas foram descartadas, elas NÃO voltam pro baralho)");
-            }
-            "0" => {
-                println!(">> Encerrando o laboratório. Até logo!");
+        match game.start_game() {
+            Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
+            Err(e) => {
+                println!("{} {}", i18n.t("error_start"), e);
                 break;
             }
-            _ => {
-                println!(">> [ERRO] Opção inválida.");
+        }
+
+        while game.phase != GamePhase::Finished {
+            let p_index = game.current_turn;
+            let active_player = &game.players[p_index];
+
+            if active_player.id == 0 {
+                ui::render_table(&i18n, &game);
+                
+                println!("  {}", i18n.t("recent_actions"));
+                let recent = if action_log.len() > 5 { &action_log[action_log.len()-5..] } else { &action_log[..] };
+                for msg in recent {
+                    println!("   > {}", msg);
+                }
+                println!("---------------------------------------------------------\n");
+                
+                println!("{}, {}!", i18n.t("your_turn"), active_player.name);
+                
+                if active_player.hole_cards.len() == 2 {
+                    println!("{}", i18n.t("your_cards"));
+                    ui::draw_cards_ascii(&active_player.hole_cards, false);
+                }
+
+                println!("\n{}", i18n.t("actions_menu"));
+                print!("{}", i18n.t("action_prompt"));
+                let _ = io::stdout().flush();
+                
+                let mut input = String::new();
+                if let Err(_) = io::stdin().read_line(&mut input) {
+                    break;
+                }
+
+                let action = match input.trim() {
+                    "1" => PlayerAction::Fold,
+                    "2" => PlayerAction::Check,
+                    "3" => PlayerAction::Call,
+                    "4" => PlayerAction::Raise(50),
+                    _ => {
+                        action_log.push(i18n.t("unknown_cmd").to_string());
+                        if game.current_highest_bet > active_player.current_bet {
+                            PlayerAction::Fold
+                        } else {
+                            PlayerAction::Check
+                        }
+                    }
+                };
+
+                match game.process_action(active_player.id, action) {
+                    Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
+                    Err(e) => action_log.push(format!("{} {}", i18n.t("invalid_move"), e)),
+                }
+            } else {
+                let amount_to_call = game.current_highest_bet - active_player.current_bet;
+                let action = if amount_to_call == 0 {
+                    PlayerAction::Check
+                } else if amount_to_call > 0 && amount_to_call <= active_player.chips {
+                    PlayerAction::Call
+                } else {
+                    PlayerAction::Fold
+                };
+
+                match game.process_action(active_player.id, action) {
+                    Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
+                    Err(e) => action_log.push(format!("{} {}", i18n.t("bot_invalid_move"), e)),
+                }
             }
+        }
+
+        ui::render_table(&i18n, &game);
+        ui::render_showdown(&i18n, &game);
+        
+        println!("  {}", i18n.t("final_actions"));
+        let recent = if action_log.len() > 8 { &action_log[action_log.len()-8..] } else { &action_log[..] };
+        for msg in recent {
+            println!("   > {}", msg);
+        }
+        println!("---------------------------------------------------------\n");
+
+        println!("\n{}", i18n.t("press_enter"));
+        let _ = io::stdout().flush();
+        let mut _input = String::new();
+        let _ = io::stdin().read_line(&mut _input);
+
+        game.dealer_button = (game.dealer_button + 1) % game.players.len();
+    }
+}
+
+fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<String>, i18n: &I18n) {
+    for event in events {
+        match event {
+            GameEvent::GameStarted => {
+                log.push(i18n.t("dealer_dealing").to_string());
+            }
+            GameEvent::PhaseChanged(phase) => {
+                log.push(format!("--- {} {:?} ---", i18n.t("phase"), phase));
+            }
+            GameEvent::CommunityCardsRevealed(cards) => {
+                let cards_str = cards.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" ");
+                log.push(format!("{} {}", i18n.t("dealer_revealed"), cards_str));
+            }
+            GameEvent::PlayerActed(id, action) => {
+                let name = &game.players[*id].name;
+                match action {
+                    PlayerAction::Fold => log.push(format!("{} {}", name, i18n.t("folded_action"))),
+                    PlayerAction::Check => log.push(format!("{} {}", name, i18n.t("checked_action"))),
+                    PlayerAction::Call => log.push(format!("{} {}", name, i18n.t("called_action"))),
+                    PlayerAction::Raise(amt) => log.push(format!("{} {} {}!", name, i18n.t("raised_by"), amt)),
+                }
+            }
+            GameEvent::PotAwarded(id, amount, hand_desc) => {
+                let name = &game.players[*id].name;
+                let local_hand = i18n.t_hand(hand_desc);
+                log.push(format!("🏆 {} {} {} {} {}! 🏆", name, i18n.t("won"), amount, i18n.t("chips_with"), local_hand.to_uppercase()));
+            }
+            _ => {}
         }
     }
 }
