@@ -147,6 +147,9 @@ fn main() {
                 }
             } else {
                 let amount_to_call = game.current_highest_bet - active_player.current_bet;
+                let active_id = active_player.id;
+                let active_chips = active_player.chips;
+                let is_aggressive = active_player.name.contains("Agressivo") || active_player.name.contains("Aggressive");
                 
                 let win_rate = if num_opponents > 0 {
                     engine::ai::calculate_win_rate(
@@ -159,19 +162,30 @@ fn main() {
                     1.0
                 };
                 
-                // Smart AI Decisions based on Monte Carlo Win Probability
-                let action = if win_rate > 0.65 {
-                    if active_player.chips >= 50 {
-                        PlayerAction::Raise(50)
-                    } else if amount_to_call > 0 && amount_to_call <= active_player.chips {
+                let base_win_rate = 1.0 / (num_opponents as f64 + 1.0);
+                
+                let (raise_threshold, call_threshold) = if is_aggressive {
+                    (base_win_rate + 0.05, base_win_rate - 0.15)
+                } else {
+                    (base_win_rate + 0.15, base_win_rate - 0.05)
+                };
+
+                let raise_amount = if is_aggressive { 150 } else { 50 };
+                let total_raise_cost = amount_to_call + raise_amount;
+
+                // Smart AI Decisions based on Monte Carlo Win Probability and Personalities
+                let action = if win_rate > raise_threshold {
+                    if active_chips >= total_raise_cost {
+                        PlayerAction::Raise(raise_amount)
+                    } else if amount_to_call > 0 && amount_to_call <= active_chips {
                         PlayerAction::Call
                     } else {
                         PlayerAction::Check
                     }
-                } else if win_rate > 0.35 {
+                } else if win_rate > call_threshold {
                     if amount_to_call == 0 {
                         PlayerAction::Check
-                    } else if amount_to_call <= active_player.chips {
+                    } else if amount_to_call <= active_chips {
                         PlayerAction::Call
                     } else {
                         PlayerAction::Fold
@@ -183,10 +197,22 @@ fn main() {
                         PlayerAction::Fold
                     }
                 };
-
-                match game.process_action(active_player.id, action) {
+                
+                match game.process_action(active_id, action) {
                     Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
-                    Err(e) => action_log.push(format!("{} {}", i18n.t("bot_invalid_move"), i18n.t(e))),
+                    Err(e) => {
+                        action_log.push(format!("{} {}", i18n.t("bot_invalid_move"), i18n.t(e)));
+                        let fallback_action = if amount_to_call > 0 && amount_to_call <= active_chips {
+                            PlayerAction::Call
+                        } else if amount_to_call == 0 {
+                            PlayerAction::Check
+                        } else {
+                            PlayerAction::Fold
+                        };
+                        if let Ok(events) = game.process_action(active_id, fallback_action) {
+                            process_events(&events, &game, &mut action_log, &i18n);
+                        }
+                    }
                 }
             }
         }
