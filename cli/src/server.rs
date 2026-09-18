@@ -118,14 +118,16 @@ fn send_to_client(s: &mut ServerState, client_id: usize, msg: &ServerMessage) {
 }
 
 fn broadcast_room_state(s: &mut ServerState, room_id: u32) {
-    let (players_clone, host_id) = if let Some(room) = s.rooms.get(&room_id) {
-        (room.players.clone(), room.host_id)
+    let (players_clone, host_id, bot_names) = if let Some(room) = s.rooms.get(&room_id) {
+        let bots = room.state.players.iter().filter(|p| p.id >= 1000).map(|p| p.name.clone()).collect::<Vec<_>>();
+        (room.players.clone(), room.host_id, bots)
     } else {
         return;
     };
 
     for &id in &players_clone {
-        let players_str = players_clone.iter().map(|pid| s.clients.get(pid).unwrap().name.clone()).collect();
+        let mut players_str: Vec<String> = players_clone.iter().map(|pid| s.clients.get(pid).unwrap().name.clone()).collect();
+        players_str.extend(bot_names.clone());
         let msg = ServerMessage::RoomState {
             room_id,
             players: players_str,
