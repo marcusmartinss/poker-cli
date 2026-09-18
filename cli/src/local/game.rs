@@ -100,7 +100,7 @@ pub fn play_local(i18n: &I18n) {
                         }
                     }
                 }
-                thread::sleep(Duration::from_millis(1500));
+                thread::sleep(Duration::from_millis(150));
             }
         }
 
