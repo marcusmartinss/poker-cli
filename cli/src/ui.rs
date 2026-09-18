@@ -96,10 +96,15 @@ pub fn render_showdown(i18n: &crate::i18n::I18n, game: &GameState) {
             // Evaluate their hand for display
             let mut all_cards = game.community_cards.clone();
             all_cards.extend(p.hole_cards.clone());
-            let hand_name = match engine::evaluator::evaluate(&all_cards) {
-                Ok(rank) => i18n.t_hand(&format!("{:?}", rank)),
-                Err(_) => i18n.t_hand("Unknown"),
+            let raw_hand = if all_cards.len() == 2 {
+                if all_cards[0].rank == all_cards[1].rank { "Pair".to_string() } else { "HighCard".to_string() }
+            } else {
+                match engine::evaluator::evaluate(&all_cards) {
+                    Ok(rank) => format!("{:?}", rank),
+                    Err(_) => "Unknown".to_string(),
+                }
             };
+            let hand_name = i18n.t_hand(&raw_hand);
             
             let possessive_str = i18n.t_player_cards(p.id == 0, &p.name);
             println!("\n  {} - {} ", possessive_str, hand_name);
