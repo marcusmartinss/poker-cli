@@ -71,7 +71,7 @@ fn main() {
                 }
                 println!("---------------------------------------------------------\n");
                 
-                println!("{}, {}!", i18n.t("your_turn"), active_player.name);
+                println!("{}\n", i18n.t("your_turn"));
                 
                 if active_player.hole_cards.len() == 2 {
                     println!("{}", i18n.t("your_cards"));
@@ -129,20 +129,12 @@ fn main() {
                             PlayerAction::Raise(amt)
                         } else {
                             action_log.push(i18n.t("invalid_amt").to_string());
-                            if game.current_highest_bet > active_player.current_bet {
-                                PlayerAction::Fold
-                            } else {
-                                PlayerAction::Check
-                            }
+                            continue;
                         }
                     },
                     _ => {
                         action_log.push(i18n.t("unknown_cmd").to_string());
-                        if game.current_highest_bet > active_player.current_bet {
-                            PlayerAction::Fold
-                        } else {
-                            PlayerAction::Check
-                        }
+                        continue;
                     }
                 };
 
