@@ -57,6 +57,9 @@ fn main() {
         while game.phase != GamePhase::Finished {
             let p_index = game.current_turn;
             let active_player = &game.players[p_index];
+            
+            // Calculate number of active opponents for the Monte Carlo simulation
+            let num_opponents = game.players.iter().filter(|p| !p.is_folded && p.id != active_player.id).count();
 
             if active_player.id == 0 {
                 ui::render_table(&i18n, &game);
@@ -73,9 +76,19 @@ fn main() {
                 if active_player.hole_cards.len() == 2 {
                     println!("{}", i18n.t("your_cards"));
                     ui::draw_cards_ascii(&active_player.hole_cards, false);
+                    
+                    if num_opponents > 0 {
+                        let win_rate = engine::ai::calculate_win_rate(
+                            &active_player.hole_cards,
+                            &game.community_cards,
+                            num_opponents,
+                            2000,
+                        );
+                        println!("  {} {:.1}%\n", i18n.t("win_prob"), win_rate * 100.0);
+                    }
                 }
 
-                println!("\n{}", i18n.t("actions_menu"));
+                println!("{}", i18n.t("actions_menu"));
                 print!("{}", i18n.t("action_prompt"));
                 let _ = io::stdout().flush();
                 
@@ -105,12 +118,41 @@ fn main() {
                 }
             } else {
                 let amount_to_call = game.current_highest_bet - active_player.current_bet;
-                let action = if amount_to_call == 0 {
-                    PlayerAction::Check
-                } else if amount_to_call > 0 && amount_to_call <= active_player.chips {
-                    PlayerAction::Call
+                
+                let win_rate = if num_opponents > 0 {
+                    engine::ai::calculate_win_rate(
+                        &active_player.hole_cards,
+                        &game.community_cards,
+                        num_opponents,
+                        2000,
+                    )
                 } else {
-                    PlayerAction::Fold
+                    1.0
+                };
+                
+                // Smart AI Decisions based on Monte Carlo Win Probability
+                let action = if win_rate > 0.65 {
+                    if active_player.chips >= 50 {
+                        PlayerAction::Raise(50)
+                    } else if amount_to_call > 0 && amount_to_call <= active_player.chips {
+                        PlayerAction::Call
+                    } else {
+                        PlayerAction::Check
+                    }
+                } else if win_rate > 0.35 {
+                    if amount_to_call == 0 {
+                        PlayerAction::Check
+                    } else if amount_to_call <= active_player.chips {
+                        PlayerAction::Call
+                    } else {
+                        PlayerAction::Fold
+                    }
+                } else {
+                    if amount_to_call == 0 {
+                        PlayerAction::Check
+                    } else {
+                        PlayerAction::Fold
+                    }
                 };
 
                 match game.process_action(active_player.id, action) {

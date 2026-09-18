@@ -59,6 +59,7 @@ impl I18n {
                 "It is not this player's turn." => "It is not this player's turn.",
                 "Cannot check. You must call or raise." => "Cannot check. You must call or raise.",
                 "Not enough chips to raise that amount." => "Not enough chips to raise that amount.",
+                "win_prob" => "HUD: Win Probability:",
                 _ => "???",
             },
             Language::Portuguese => match key {
@@ -103,6 +104,7 @@ impl I18n {
                 "It is not this player's turn." => "Não é o turno deste jogador.",
                 "Cannot check. You must call or raise." => "Não pode dar Mesa (Check). Você deve Pagar (Call) ou Aumentar (Raise).",
                 "Not enough chips to raise that amount." => "Fichas insuficientes para aumentar esse valor.",
+                "win_prob" => "HUD: Probabilidade de Vitória:",
                 _ => "???",
             },
         }

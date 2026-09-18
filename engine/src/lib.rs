@@ -4,3 +4,4 @@ pub mod evaluator;
 pub mod event;
 pub mod player;
 pub mod state;
+pub mod ai;
