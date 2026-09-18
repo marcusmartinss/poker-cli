@@ -42,8 +42,8 @@ pub fn render_table(i18n: &crate::i18n::I18n, game: &GameState) {
     print!("{}[2J{}[1;1H", 27 as char, 27 as char);
 
     println!("=========================================================");
-    println!("  {}: {:?}  |  {}: ${}  |  {}: ${}", 
-        i18n.t("phase"), game.phase, 
+    println!("  {}: {}  |  {}: ${}  |  {}: ${}", 
+        i18n.t("phase"), i18n.t_phase(&game.phase), 
         i18n.t("pot"), game.pot, 
         i18n.t("highest_bet"), game.current_highest_bet);
     println!("=========================================================\n");
@@ -93,7 +93,22 @@ pub fn render_showdown(i18n: &crate::i18n::I18n, game: &GameState) {
         if p.is_folded {
             println!("\n  {} {}", p.name, i18n.t("folded_end"));
         } else {
-            println!("\n  {}'s {}:", p.name, i18n.t("cards_end"));
+            let mut all_cards = game.community_cards.clone();
+            all_cards.extend(p.hole_cards.clone());
+            
+            let hand_str = if let Ok(rank) = engine::evaluator::evaluate(&all_cards) {
+                format!("{:?}", rank)
+            } else {
+                "".to_string()
+            };
+            
+            let localized_hand = if !hand_str.is_empty() {
+                format!("- {} ", i18n.t_hand(&hand_str))
+            } else {
+                "".to_string()
+            };
+
+            println!("\n  {}'s {} {}", p.name, i18n.t("cards_end"), localized_hand);
             draw_cards_ascii(&p.hole_cards, false);
         }
     }

@@ -101,7 +101,7 @@ fn main() {
 
                 match game.process_action(active_player.id, action) {
                     Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
-                    Err(e) => action_log.push(format!("{} {}", i18n.t("invalid_move"), e)),
+                    Err(e) => action_log.push(format!("{} {}", i18n.t("invalid_move"), i18n.t(e))),
                 }
             } else {
                 let amount_to_call = game.current_highest_bet - active_player.current_bet;
@@ -115,7 +115,7 @@ fn main() {
 
                 match game.process_action(active_player.id, action) {
                     Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
-                    Err(e) => action_log.push(format!("{} {}", i18n.t("bot_invalid_move"), e)),
+                    Err(e) => action_log.push(format!("{} {}", i18n.t("bot_invalid_move"), i18n.t(e))),
                 }
             }
         }
@@ -146,7 +146,7 @@ fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<String>,
                 log.push(i18n.t("dealer_dealing").to_string());
             }
             GameEvent::PhaseChanged(phase) => {
-                log.push(format!("--- {} {:?} ---", i18n.t("phase"), phase));
+                log.push(format!("--- {} {} ---", i18n.t("phase"), i18n.t_phase(phase)));
             }
             GameEvent::CommunityCardsRevealed(cards) => {
                 let cards_str = cards.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" ");

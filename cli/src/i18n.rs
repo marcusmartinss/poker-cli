@@ -1,3 +1,5 @@
+use engine::event::GamePhase;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Language {
     English,
@@ -51,6 +53,12 @@ impl I18n {
                 "human_name" => "You (Human)",
                 "bot1_name" => "Conservative Bot",
                 "bot2_name" => "Aggressive Bot",
+                // Engine Errors
+                "Not enough players to start." => "Not enough players to start.",
+                "Game is not active." => "Game is not active.",
+                "It is not this player's turn." => "It is not this player's turn.",
+                "Cannot check. You must call or raise." => "Cannot check. You must call or raise.",
+                "Not enough chips to raise that amount." => "Not enough chips to raise that amount.",
                 _ => "???",
             },
             Language::Portuguese => match key {
@@ -89,27 +97,72 @@ impl I18n {
                 "human_name" => "Você (Humano)",
                 "bot1_name" => "Bot Conservador",
                 "bot2_name" => "Bot Agressivo",
+                // Engine Errors
+                "Not enough players to start." => "Não há jogadores suficientes para começar.",
+                "Game is not active." => "O jogo não está ativo.",
+                "It is not this player's turn." => "Não é o turno deste jogador.",
+                "Cannot check. You must call or raise." => "Não pode dar Mesa (Check). Você deve Pagar (Call) ou Aumentar (Raise).",
+                "Not enough chips to raise that amount." => "Fichas insuficientes para aumentar esse valor.",
                 _ => "???",
             },
         }
     }
 
-    pub fn t_hand(&self, hand_desc: &str) -> String {
+    pub fn t_phase(&self, phase: &GamePhase) -> &'static str {
         if self.lang == Language::English {
-            return hand_desc.to_string();
+            match phase {
+                GamePhase::WaitingForPlayers => "Waiting For Players",
+                GamePhase::PreFlop => "Pre-Flop",
+                GamePhase::Flop => "Flop",
+                GamePhase::Turn => "Turn",
+                GamePhase::River => "River",
+                GamePhase::Showdown => "Showdown",
+                GamePhase::Finished => "Finished",
+            }
+        } else {
+            match phase {
+                GamePhase::WaitingForPlayers => "Aguardando Jogadores",
+                GamePhase::PreFlop => "Pré-Flop",
+                GamePhase::Flop => "Flop",
+                GamePhase::Turn => "Turn",
+                GamePhase::River => "River",
+                GamePhase::Showdown => "Showdown",
+                GamePhase::Finished => "Finalizado",
+            }
         }
-        
+    }
+
+    pub fn t_hand(&self, hand_desc: &str) -> String {
         let h = hand_desc.to_lowercase();
-        if h.contains("highcard") { "Carta Alta".to_string() }
-        else if h.contains("twopair") { "Dois Pares".to_string() }
-        else if h.contains("pair") { "Um Par".to_string() }
-        else if h.contains("threeofakind") { "Trinca".to_string() }
-        else if h.contains("straightflush") { "Straight Flush".to_string() }
-        else if h.contains("straight") { "Sequência".to_string() }
-        else if h.contains("flush") { "Flush".to_string() }
-        else if h.contains("fullhouse") { "Full House".to_string() }
-        else if h.contains("fourofakind") { "Quadra".to_string() }
-        else if h.contains("royalflush") { "Royal Flush".to_string() }
-        else { hand_desc.to_string() }
+        
+        if self.lang == Language::English {
+            if h.contains("everyone else folded") { "Everyone else folded".to_string() }
+            else if h.contains("unknown") { "Unknown".to_string() }
+            else if h.contains("highcard") { "High Card".to_string() }
+            else if h.contains("twopair") { "Two Pair".to_string() }
+            else if h.contains("pair") { "One Pair".to_string() }
+            else if h.contains("threeofakind") { "Three of a Kind".to_string() }
+            else if h.contains("straightflush") { "Straight Flush".to_string() }
+            else if h.contains("straight") { "Straight".to_string() }
+            else if h.contains("flush") { "Flush".to_string() }
+            else if h.contains("fullhouse") { "Full House".to_string() }
+            else if h.contains("fourofakind") { "Four of a Kind".to_string() }
+            else if h.contains("royalflush") { "Royal Flush".to_string() }
+            else { hand_desc.to_string() }
+        } else {
+            if h.contains("everyone else folded") { "Todos os outros correram".to_string() }
+            else if h.contains("unknown") { "Desconhecido".to_string() }
+            else if h.contains("highcard") { "Carta Alta".to_string() }
+            else if h.contains("twopair") { "Dois Pares".to_string() }
+            else if h.contains("pair") { "Um Par".to_string() }
+            else if h.contains("threeofakind") { "Trinca".to_string() }
+            else if h.contains("straightflush") { "Straight Flush".to_string() }
+            else if h.contains("straight") { "Sequência".to_string() }
+            else if h.contains("flush") { "Flush".to_string() }
+            else if h.contains("fullhouse") { "Full House".to_string() }
+            else if h.contains("fourofakind") { "Quadra".to_string() }
+            else if h.contains("royalflush") { "Royal Flush".to_string() }
+            else { hand_desc.to_string() }
+        }
     }
 }
