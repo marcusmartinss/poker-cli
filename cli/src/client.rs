@@ -151,7 +151,13 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                             if let Some(a) = action {
                                 send_msg(ClientMessage::Action(a));
                             } else {
-                                print!("{}\n=> ", i18n.t("actions_menu"));
+                                let call_amt = game.current_highest_bet - me.current_bet;
+                                let menu_str = if call_amt == 0 {
+                                    format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
+                                } else {
+                                    format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
+                                };
+                                print!("{}\n=> ", menu_str);
                                 let _ = io::stdout().flush();
                             }
                         }
@@ -210,9 +216,17 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                     {
                         if let Some(game) = &game_state_opt {
                             if game.players[game.current_turn].id == my_id {
-                                print!("{}\n{esc}[0m", i18n.t("actions_menu"), esc = 27 as char);
-                                print!("{}", i18n.t("action_prompt"));
-                                let _ = io::stdout().flush();
+                                if let Some(me) = game.players.iter().find(|p| p.id == my_id) {
+                                    let call_amt = game.current_highest_bet - me.current_bet;
+                                    let menu_str = if call_amt == 0 {
+                                        format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
+                                    } else {
+                                        format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
+                                    };
+                                    print!("{}\n{esc}[0m", menu_str, esc = 27 as char);
+                                    print!("{}", i18n.t("action_prompt"));
+                                    let _ = io::stdout().flush();
+                                }
                             }
                         }
                     }
@@ -336,10 +350,18 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                         if state.current_turn < state.players.len()
                             && state.players[state.current_turn].id == my_id
                         {
-                            println!("{}", i18n.t("your_turn"));
-                            println!("{}", i18n.t("actions_menu"));
-                            print!("{}", i18n.t("action_prompt"));
-                            let _ = io::stdout().flush();
+                            if let Some(me) = state.players.iter().find(|p| p.id == my_id) {
+                                let call_amt = state.current_highest_bet - me.current_bet;
+                                let menu_str = if call_amt == 0 {
+                                    format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
+                                } else {
+                                    format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
+                                };
+                                println!("{}", i18n.t("your_turn"));
+                                println!("{}", menu_str);
+                                print!("{}", i18n.t("action_prompt"));
+                                let _ = io::stdout().flush();
+                            }
                         }
                     }
                 }
