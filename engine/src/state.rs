@@ -47,7 +47,10 @@ impl GameState {
     pub fn start_game(&mut self) -> Result<Vec<GameEvent>, &'static str> {
         let active_count = self.players.iter().filter(|p| p.chips > 0).count();
         if active_count < 2 {
-            return Err("Not enough players with chips to start.");
+            // Tournament is over, reset everyone to 1000 chips to restart the game
+            for p in &mut self.players {
+                p.chips = 1000;
+            }
         }
 
         self.phase = GamePhase::PreFlop;
