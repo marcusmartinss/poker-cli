@@ -13,15 +13,18 @@ pub fn draw_cards_ascii(cards: &[Card], is_board: bool) {
         if i < cards.len() {
             let r = cards[i].rank.to_string();
             let s = cards[i].suit.to_string();
+            
+            let is_red = cards[i].suit == engine::card::Suit::Hearts || cards[i].suit == engine::card::Suit::Diamonds;
+            let (c_start, c_end) = if is_red { ("[31m", "[0m") } else { ("", "") };
 
             let pad_left = if r.len() == 2 { "" } else { " " };
             let pad_right = if r.len() == 2 { "" } else { " " };
 
-            lines[0].push_str("┌───────┐ ");
-            lines[1].push_str(&format!("│ {}{}    │ ", r, pad_left));
-            lines[2].push_str(&format!("│   {}   │ ", s));
-            lines[3].push_str(&format!("│    {}{} │ ", pad_right, r));
-            lines[4].push_str("└───────┘ ");
+            lines[0].push_str(&format!("{}┌───────┐{} ", c_start, c_end));
+            lines[1].push_str(&format!("{}│ {}{}    │{} ", c_start, r, pad_left, c_end));
+            lines[2].push_str(&format!("{}│   {}   │{} ", c_start, s, c_end));
+            lines[3].push_str(&format!("{}│    {}{} │{} ", c_start, pad_right, r, c_end));
+            lines[4].push_str(&format!("{}└───────┘{} ", c_start, c_end));
         } else if is_board {
             // Draw empty placeholders for community cards not yet dealt
             lines[0].push_str("┌───────┐ ");

@@ -18,7 +18,14 @@ pub fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<Stri
             GameEvent::CommunityCardsRevealed(cards) => {
                 let cards_str = cards
                     .iter()
-                    .map(|c| c.to_string())
+                    .map(|c| {
+                        let is_red = c.suit == engine::card::Suit::Hearts || c.suit == engine::card::Suit::Diamonds;
+                        if is_red {
+                            format!("[31m{}[0m", c.to_string())
+                        } else {
+                            c.to_string()
+                        }
+                    })
                     .collect::<Vec<_>>()
                     .join(" ");
                 log.push(format!("{} {}", i18n.t("dealer_revealed"), cards_str));
