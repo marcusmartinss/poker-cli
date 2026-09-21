@@ -3,7 +3,7 @@ use engine::event::GameEvent;
 use engine::player::Player;
 use engine::state::GameState;
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -67,7 +67,7 @@ pub fn start_server(port: u16) {
     }
 }
 
-fn handle_client(mut stream: TcpStream, state: Arc<Mutex<ServerState>>) {
+fn handle_client(stream: TcpStream, state: Arc<Mutex<ServerState>>) {
     let write_stream = stream.try_clone().unwrap();
     let client_id;
     {

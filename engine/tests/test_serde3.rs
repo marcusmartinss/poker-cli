@@ -4,7 +4,7 @@ use engine::state::GameState;
 
 #[test]
 fn test_serde() {
-    let mut game = GameState::new();
+    let game = GameState::new();
     let events = vec![
         GameEvent::PlayerActed(1000, PlayerAction::Call),
         GameEvent::PhaseChanged(GamePhase::Flop),

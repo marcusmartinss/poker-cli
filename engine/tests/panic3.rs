@@ -1,5 +1,5 @@
 use engine::card::{Card, Rank, Suit};
-use engine::event::{GamePhase, PlayerAction};
+use engine::event::{PlayerAction};
 use engine::player::Player;
 use engine::state::GameState;
 

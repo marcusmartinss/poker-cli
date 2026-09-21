@@ -1,7 +1,7 @@
 use crate::i18n::I18n;
 use crate::net_messages::{ClientMessage, ServerMessage};
 use engine::event::PlayerAction;
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::net::TcpStream;
 use std::sync::mpsc;
 use std::thread;
@@ -19,7 +19,7 @@ enum InputMode {
 }
 
 pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
-    let mut stream = match TcpStream::connect(format!("{}:{}", ip, port)) {
+    let stream = match TcpStream::connect(format!("{}:{}", ip, port)) {
         Ok(s) => s,
         Err(_) => {
             println!("Failed to connect to {}:{}", ip, port);
