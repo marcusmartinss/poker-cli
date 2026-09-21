@@ -60,6 +60,7 @@ impl GameState {
         for player in &mut self.players {
             player.has_acted = false;
             player.current_bet = 0;
+            player.invested_in_hand = 0;
             player.hole_cards.clear();
             
             if player.chips == 0 {
@@ -89,6 +90,7 @@ impl GameState {
             player.is_all_in = false;
             player.has_acted = false;
             player.current_bet = 0;
+            player.invested_in_hand = 0;
             player.hole_cards.clear();
             if let Some(c1) = self.deck.draw() {
                 player.hole_cards.push(c1);
@@ -154,6 +156,7 @@ impl GameState {
         let actual = amount.min(p.chips);
         p.chips -= actual;
         p.current_bet += actual;
+        p.invested_in_hand += actual;
         self.pot += actual;
         if p.chips == 0 {
             p.is_all_in = true;
@@ -183,6 +186,7 @@ impl GameState {
 
                 player.chips -= actual_call;
                 player.current_bet += actual_call;
+                player.invested_in_hand += actual_call;
                 self.pot += actual_call;
 
                 if player.chips == 0 {
@@ -203,6 +207,7 @@ impl GameState {
 
                 player.chips -= total_needed;
                 player.current_bet += total_needed;
+                player.invested_in_hand += total_needed;
                 self.pot += total_needed;
                 self.current_highest_bet = player.current_bet;
                 if *amount > self.min_raise {
@@ -282,57 +287,100 @@ impl GameState {
         self.phase = GamePhase::Showdown;
         events.push(GameEvent::PhaseChanged(self.phase));
 
-        let mut best_rank: Option<crate::evaluator::HandRank> = None;
-        let mut winners: Vec<usize> = Vec::new();
-
+        // Evaluate all hands first for players who are not folded
+        let mut player_ranks = std::collections::HashMap::new();
         for (i, p) in self.players.iter().enumerate() {
-            if p.is_folded {
-                continue;
-            }
-
-            let mut all_cards = self.community_cards.clone();
-            all_cards.extend(p.hole_cards.clone());
-
-            if let Ok(rank) = crate::evaluator::evaluate(&all_cards) {
-                match best_rank {
-                    None => {
-                        best_rank = Some(rank);
-                        winners.push(i);
-                    }
-                    Some(ref best) => {
-                        if rank > *best {
-                            best_rank = Some(rank);
-                            winners.clear();
-                            winners.push(i);
-                        } else if rank == *best {
-                            winners.push(i);
-                        }
-                    }
+            if !p.is_folded {
+                let mut all_cards = self.community_cards.clone();
+                all_cards.extend(p.hole_cards.clone());
+                if let Ok(rank) = crate::evaluator::evaluate(&all_cards) {
+                    player_ranks.insert(i, rank);
                 }
             }
         }
 
-        if !winners.is_empty() {
-            let split_amount = self.pot / winners.len() as u32;
-            let hand_desc = match &best_rank {
-                Some(r) => format!("{:?}", r),
-                None => "Unknown".to_string(),
-            };
+        // Calculate side pots
+        let mut sorted_players: Vec<(usize, u32, bool)> = self.players.iter().enumerate()
+            .map(|(i, p)| (i, p.invested_in_hand, p.is_folded))
+            .collect();
+        sorted_players.sort_by_key(|&(_, amount, _)| amount);
 
-            for &idx in &winners {
-                self.players[idx].chips += split_amount;
-                events.push(GameEvent::PotAwarded(
-                    self.players[idx].id,
-                    split_amount,
-                    hand_desc.clone(),
-                ));
+        let mut pots: Vec<(u32, Vec<usize>)> = Vec::new();
+        let mut current_deducted = 0;
+        
+        for i in 0..sorted_players.len() {
+            let amount = sorted_players[i].1;
+            if amount > current_deducted {
+                let diff = amount - current_deducted;
+                let mut pot_amount = 0;
+                let mut eligible = Vec::new();
+                for j in i..sorted_players.len() {
+                    pot_amount += diff;
+                    if !sorted_players[j].2 { // if not folded
+                        eligible.push(sorted_players[j].0);
+                    }
+                }
+                pots.push((pot_amount, eligible));
+                current_deducted = amount;
             }
+        }
+
+        let mut winnings: std::collections::HashMap<usize, (u32, String)> = std::collections::HashMap::new();
+
+        for (pot_amount, eligible) in pots {
+            if pot_amount == 0 || eligible.is_empty() {
+                continue;
+            }
+
+            let mut best_rank: Option<crate::evaluator::HandRank> = None;
+            let mut winners = Vec::new();
+
+            for &idx in &eligible {
+                if let Some(rank) = player_ranks.get(&idx) {
+                    match best_rank {
+                        None => {
+                            best_rank = Some(*rank);
+                            winners.push(idx);
+                        }
+                        Some(ref best) => {
+                            if *rank > *best {
+                                best_rank = Some(*rank);
+                                winners.clear();
+                                winners.push(idx);
+                            } else if *rank == *best {
+                                winners.push(idx);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !winners.is_empty() {
+                let split_amount = pot_amount / winners.len() as u32;
+                let hand_desc = match &best_rank {
+                    Some(r) => format!("{:?}", r),
+                    None => "Unknown".to_string(),
+                };
+
+                for &idx in &winners {
+                    let entry = winnings.entry(idx).or_insert((0, hand_desc.clone()));
+                    entry.0 += split_amount;
+                }
+            }
+        }
+
+        for (idx, (amount, desc)) in winnings {
+            self.players[idx].chips += amount;
+            events.push(GameEvent::PotAwarded(
+                self.players[idx].id,
+                amount,
+                desc,
+            ));
         }
 
         self.phase = GamePhase::Finished;
         events.push(GameEvent::PhaseChanged(self.phase));
     }
-
     fn deal_community_cards(&mut self, count: usize, events: &mut Vec<GameEvent>) {
         events.push(GameEvent::PhaseChanged(self.phase));
         let mut drawn = Vec::new();
