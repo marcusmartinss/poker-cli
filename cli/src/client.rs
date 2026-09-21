@@ -307,113 +307,114 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                     // Render events
                     crate::process_events(&events, &state, &mut action_log, i18n);
 
-                    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-                    crate::ui::render_table(i18n, &state);
-
-                    if state.phase == engine::event::GamePhase::Showdown
-                        || state.phase == engine::event::GamePhase::Finished
-                    {
-                        crate::ui::render_showdown(i18n, &state);
-                    }
-
-                    println!("  [ {} ]", i18n.t("final_actions"));
-                    let recent = if action_log.len() > 8 {
-                        &action_log[action_log.len() - 8..]
-                    } else {
-                        &action_log[..]
-                    };
-                    for msg in recent {
-                        println!("   > {}", msg);
-                    }
-                    println!("---------------------------------------------------------\n");
-
-                    if state.phase == engine::event::GamePhase::Finished {
-                        if is_host {
-                            println!("{}", i18n.t("press_enter"));
-                        } else {
-                            println!("Hand Finished. Waiting for Host to start next hand...");
-                        }
-                    } else if state.phase != engine::event::GamePhase::Showdown {
-                        // Display my cards if I'm not folded and not finished
-                        if let Some(me) = state.players.iter().find(|p| p.id == my_id) {
-                            if me.hole_cards.len() == 2 {
-                                let mut my_cards = state.community_cards.clone();
-                                my_cards.extend(me.hole_cards.clone());
-                                let raw_hand = if my_cards.len() == 2 {
-                                    if my_cards[0].rank == my_cards[1].rank {
-                                        "Pair".to_string()
-                                    } else {
-                                        "HighCard".to_string()
-                                    }
-                                } else {
-                                    match engine::evaluator::evaluate(&my_cards) {
-                                        Ok(rank) => format!("{:?}", rank),
-                                        Err(_) => "".to_string(),
-                                    }
-                                };
-                                println!(
-                                    "  {} ( {} )",
-                                    i18n.t("your_cards"),
-                                    i18n.t_hand(&raw_hand)
-                                );
-                                crate::ui::draw_cards_ascii(&me.hole_cards, false);
-                                println!();
-                            }
-                        }
-
-                        // Check if it's my turn
-                        if state.current_turn < state.players.len()
-                            && state.players[state.current_turn].id == my_id
-                        {
-                            if let Some(me) = state.players.iter().find(|p| p.id == my_id) {
-                                let call_amt = state.current_highest_bet - me.current_bet;
-                                let menu_str = if call_amt == 0 {
-                                    format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
-                                } else {
-                                    format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
-                                };
-                                println!("{}", i18n.t("your_turn"));
-                                println!("{}", menu_str);
-                                print!("{}", i18n.t("action_prompt"));
-                                let _ = io::stdout().flush();
-                            }
-                        }
-                    }
+                    render_game_screen(&state, my_id, is_host, &action_log, i18n, matches!(mode, InputMode::GamePlayRaising));
                 }
                 ServerMessage::Chat { sender, message } => {
-                    print!("{esc}[2K\x0D", esc = 27 as char);
-                    println!("[CHAT] {}: {}", sender, message);
-                    if matches!(mode, InputMode::Name) {
-                        print!("Enter your name: ");
-                    } else if matches!(mode, InputMode::Lobby) {
-                        print!("\nChoose an option: ");
-                    } else if matches!(mode, InputMode::LobbyCreatingRoom) {
-                        print!("Room name: ");
-                    } else if matches!(mode, InputMode::LobbyJoiningRoom) {
-                        print!("Room ID to join: ");
-                    } else if matches!(mode, InputMode::RoomHost) {
-                        print!("\n=> ");
-                    } else if matches!(mode, InputMode::RoomGuest) || matches!(mode, InputMode::GamePlay) || matches!(mode, InputMode::GamePlayRaising) {
-                        // In game modes
-                        if let Some(game) = &game_state_opt {
-                            if game.phase == engine::event::GamePhase::Finished {
-                                print!("{}", i18n.t("press_enter"));
-                            } else if game.current_turn < game.players.len() && game.players[game.current_turn].id == my_id {
-                                if let Some(me) = game.players.iter().find(|p| p.id == my_id) {
-                                    if matches!(mode, InputMode::GamePlayRaising) {
-                                        print!("{} (Min: {}): ", i18n.t("raise_prompt").trim_end_matches(": "), game.min_raise);
-                                    } else {
-                                        print!("{}", i18n.t("action_prompt"));
-                                    }
-                                }
-                            }
+                    if let Some(game) = &game_state_opt {
+                        let msg_str = format!("[CHAT] {}: {}", sender, message);
+                        action_log.push(msg_str);
+                        render_game_screen(game, my_id, is_host, &action_log, i18n, matches!(mode, InputMode::GamePlayRaising));
+                    } else {
+                        // In lobby
+                        print!("{esc}[2K\x0D", esc = 27 as char);
+                        println!("[CHAT] {}: {}", sender, message);
+                        if matches!(mode, InputMode::Name) {
+                            print!("Enter your name: ");
+                        } else if matches!(mode, InputMode::Lobby) {
+                            print!("\nChoose an option: ");
+                        } else if matches!(mode, InputMode::LobbyCreatingRoom) {
+                            print!("Room name: ");
+                        } else if matches!(mode, InputMode::LobbyJoiningRoom) {
+                            print!("Room ID to join: ");
+                        } else if matches!(mode, InputMode::RoomHost) {
+                            print!("\n=> ");
                         }
+                        let _ = std::io::Write::flush(&mut std::io::stdout());
                     }
-                    let _ = std::io::Write::flush(&mut std::io::stdout());
                 }
             }
         }
 
         thread::sleep(Duration::from_millis(10));
     }
+}
+
+fn render_game_screen(state: &engine::state::GameState, my_id: usize, is_host: bool, action_log: &[String], i18n: &crate::i18n::I18n, is_raising: bool) {
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+    crate::ui::render_table(i18n, state);
+
+    if state.phase == engine::event::GamePhase::Showdown
+        || state.phase == engine::event::GamePhase::Finished
+    {
+        crate::ui::render_showdown(i18n, state);
+    }
+
+    println!("  [ {} ]", i18n.t("final_actions"));
+    let recent = if action_log.len() > 10 {
+        &action_log[action_log.len() - 10..]
+    } else {
+        &action_log[..]
+    };
+    for msg in recent {
+        println!("   > {}", msg);
+    }
+    println!("---------------------------------------------------------\n");
+
+    if state.phase == engine::event::GamePhase::Finished {
+        if is_host {
+            println!("{}", i18n.t("press_enter"));
+        } else {
+            println!("Hand Finished. Waiting for Host to start next hand...");
+        }
+    } else if state.phase != engine::event::GamePhase::Showdown {
+        // Display my cards if I'm not folded and not finished
+        if let Some(me) = state.players.iter().find(|p| p.id == my_id) {
+            if me.hole_cards.len() == 2 {
+                let mut my_cards = state.community_cards.clone();
+                my_cards.extend(me.hole_cards.clone());
+                let raw_hand = if my_cards.len() == 2 {
+                    if my_cards[0].rank == my_cards[1].rank {
+                        "Pair".to_string()
+                    } else {
+                        "HighCard".to_string()
+                    }
+                } else {
+                    match engine::evaluator::evaluate(&my_cards) {
+                        Ok(rank) => format!("{:?}", rank),
+                        Err(_) => "".to_string(),
+                    }
+                };
+                println!(
+                    "  {} ( {} )",
+                    i18n.t("your_cards"),
+                    i18n.t_hand(&raw_hand)
+                );
+                crate::ui::draw_cards_ascii(&me.hole_cards, false);
+                println!();
+            }
+        }
+
+        // Check if it's my turn
+        if state.current_turn < state.players.len()
+            && state.players[state.current_turn].id == my_id
+        {
+            if let Some(me) = state.players.iter().find(|p| p.id == my_id) {
+                let call_amt = state.current_highest_bet - me.current_bet;
+                let menu_str = if call_amt == 0 {
+                    format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
+                } else {
+                    format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
+                };
+                println!("{}", i18n.t("your_turn"));
+                
+                if is_raising {
+                    print!("{} (Min: {}): ", i18n.t("raise_prompt").trim_end_matches(": "), state.min_raise);
+                } else {
+                    println!("{}", menu_str);
+                    print!("{}", i18n.t("action_prompt"));
+                }
+            }
+        }
+    }
+    let _ = std::io::Write::flush(&mut std::io::stdout());
 }
