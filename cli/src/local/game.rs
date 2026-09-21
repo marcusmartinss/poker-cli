@@ -195,6 +195,14 @@ fn handle_human_turn(
                 } else {
                     Some(PlayerAction::Raise(active_chips - call_amt))
                 }
+            } else if amt_trim == "min" {
+                let available_to_raise = active_chips.saturating_sub(call_amt);
+                if available_to_raise == 0 {
+                    Some(PlayerAction::Call)
+                } else {
+                    let raise_amt = std::cmp::min(game.min_raise, available_to_raise);
+                    Some(PlayerAction::Raise(raise_amt))
+                }
             } else if let Ok(amt) = amt_trim.parse::<u32>() {
                 Some(PlayerAction::Raise(amt))
             } else {
