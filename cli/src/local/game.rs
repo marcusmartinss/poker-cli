@@ -163,7 +163,13 @@ fn handle_human_turn(
     active_bet: u32,
     i18n: &I18n,
 ) -> Option<PlayerAction> {
-    println!("{}", i18n.t("actions_menu"));
+    let call_amt = game.current_highest_bet - active_bet;
+    let menu_str = if call_amt == 0 {
+        format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
+    } else {
+        format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
+    };
+    println!("{}", menu_str);
     print!("{}", i18n.t("action_prompt"));
     let _ = io::stdout().flush();
 
@@ -173,9 +179,8 @@ fn handle_human_turn(
 
     match input {
         "1" => Some(PlayerAction::Fold),
-        "2" => Some(PlayerAction::Check),
-        "3" => Some(PlayerAction::Call),
-        "4" => {
+        "2" => if call_amt == 0 { Some(PlayerAction::Check) } else { Some(PlayerAction::Call) },
+        "3" => {
             print!("{} (Min: {}): ", i18n.t("raise_prompt").trim_end_matches(": "), game.min_raise);
             let _ = io::stdout().flush();
             let mut amt_input = String::new();
