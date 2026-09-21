@@ -13,10 +13,10 @@ pub fn draw_cards_ascii(cards: &[Card], is_board: bool) {
         if i < cards.len() {
             let r = cards[i].rank.to_string();
             let s = cards[i].suit.to_string();
-            
+
             let pad_left = if r.len() == 2 { "" } else { " " };
             let pad_right = if r.len() == 2 { "" } else { " " };
-            
+
             lines[0].push_str("┌───────┐ ");
             lines[1].push_str(&format!("│ {}{}    │ ", r, pad_left));
             lines[2].push_str(&format!("│   {}   │ ", s));
@@ -42,10 +42,15 @@ pub fn render_table(i18n: &crate::i18n::I18n, game: &GameState) {
     print!("{}[2J{}[1;1H", 27 as char, 27 as char);
 
     println!("=========================================================");
-    println!("  {}: {}  |  {}: ${}  |  {}: ${}", 
-        i18n.t("phase"), i18n.t_phase(&game.phase), 
-        i18n.t("pot"), game.pot, 
-        i18n.t("highest_bet"), game.current_highest_bet);
+    println!(
+        "  {}: {}  |  {}: ${}  |  {}: ${}",
+        i18n.t("phase"),
+        i18n.t_phase(&game.phase),
+        i18n.t("pot"),
+        game.pot,
+        i18n.t("highest_bet"),
+        game.current_highest_bet
+    );
     println!("=========================================================\n");
 
     println!("  {}", i18n.t("board_cards"));
@@ -54,6 +59,12 @@ pub fn render_table(i18n: &crate::i18n::I18n, game: &GameState) {
 
     println!("---------------------------------------------------------");
     println!("  {}", i18n.t("players"));
+    println!("  +----+------+-----------------+--------+---------+------------+");
+    println!(
+        "  | {} | Role | Name            | Chips  | Bet     | Status     |",
+        "=>"
+    );
+    println!("  +----+------+-----------------+--------+---------+------------+");
     let num_players = game.players.len();
     for (i, p) in game.players.iter().enumerate() {
         let is_dealer = game.dealer_button == i;
@@ -71,31 +82,36 @@ pub fn render_table(i18n: &crate::i18n::I18n, game: &GameState) {
         };
 
         let active_token = if game.current_turn == i { "=>" } else { "  " };
-        
+
         let status = if p.is_folded {
-            format!("({})", i18n.t("folded"))
+            i18n.t("folded")
         } else if p.is_all_in {
-            format!("({})", i18n.t("all_in"))
+            i18n.t("all_in")
         } else {
-            "".to_string()
+            ""
         };
 
-        // Truncate name
         let mut name = p.name.clone();
         if name.chars().count() > 15 {
             name = name.chars().take(12).collect::<String>();
             name.push_str("...");
         }
 
-        println!("  {} {:<4} {:<15} | ${:<6} | {}: ${:<6} {}", 
-            active_token, role_token, name, p.chips, i18n.t("bet"), p.current_bet, status);
+        println!(
+            "  | {:<2} | {:<4} | {:<15} | ${:<5} | ${:<6} | {:<10} |",
+            active_token, role_token, name, p.chips, p.current_bet, status
+        );
     }
+    println!("  +----+------+-----------------+--------+---------+------------+");
     println!("---------------------------------------------------------\n");
 }
 
 pub fn render_showdown(i18n: &crate::i18n::I18n, game: &GameState) {
     println!("\n=========================================================");
-    println!("                 {}                         ", i18n.t("showdown_reveal"));
+    println!(
+        "                 {}                         ",
+        i18n.t("showdown_reveal")
+    );
     println!("=========================================================");
     for p in &game.players {
         if p.is_folded {
@@ -105,7 +121,11 @@ pub fn render_showdown(i18n: &crate::i18n::I18n, game: &GameState) {
             let mut all_cards = game.community_cards.clone();
             all_cards.extend(p.hole_cards.clone());
             let raw_hand = if all_cards.len() == 2 {
-                if all_cards[0].rank == all_cards[1].rank { "Pair".to_string() } else { "HighCard".to_string() }
+                if all_cards[0].rank == all_cards[1].rank {
+                    "Pair".to_string()
+                } else {
+                    "HighCard".to_string()
+                }
             } else {
                 match engine::evaluator::evaluate(&all_cards) {
                     Ok(rank) => format!("{:?}", rank),
@@ -113,7 +133,7 @@ pub fn render_showdown(i18n: &crate::i18n::I18n, game: &GameState) {
                 }
             };
             let hand_name = i18n.t_hand(&raw_hand);
-            
+
             let possessive_str = i18n.t_player_cards(p.id == 0, &p.name);
             println!("\n  {} - {} ", possessive_str, hand_name);
             draw_cards_ascii(&p.hole_cards, false);

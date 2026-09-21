@@ -59,7 +59,9 @@ impl I18n {
                 "Game is not active." => "Game is not active.",
                 "It is not this player's turn." => "It is not this player's turn.",
                 "Cannot check. You must call or raise." => "Cannot check. You must call or raise.",
-                "Not enough chips to raise that amount." => "Not enough chips to raise that amount.",
+                "Not enough chips to raise that amount." => {
+                    "Not enough chips to raise that amount."
+                }
                 "win_prob" => "Win Probability:",
                 "current_hand" => "Current Hand:",
                 "you_lost" => "You lost all your chips!",
@@ -109,8 +111,12 @@ impl I18n {
                 "Not enough players to start." => "Não há jogadores suficientes para começar.",
                 "Game is not active." => "O jogo não está ativo.",
                 "It is not this player's turn." => "Não é o turno deste jogador.",
-                "Cannot check. You must call or raise." => "Não pode dar Mesa (Check). Você deve Pagar (Call) ou Aumentar (Raise).",
-                "Not enough chips to raise that amount." => "Fichas insuficientes para aumentar esse valor.",
+                "Cannot check. You must call or raise." => {
+                    "Não pode dar Mesa (Check). Você deve Pagar (Call) ou Aumentar (Raise)."
+                }
+                "Not enough chips to raise that amount." => {
+                    "Fichas insuficientes para aumentar esse valor."
+                }
                 "win_prob" => "Probabilidade de Vitória:",
                 "current_hand" => "Mão Atual:",
                 "you_lost" => "Você perdeu todas as suas fichas!",
@@ -149,31 +155,55 @@ impl I18n {
     pub fn t_hand(&self, raw: &str) -> String {
         match self.lang {
             Language::English => {
-                if raw.contains("Everyone else folded") || raw.contains("everyone else folded") { "Everyone else folded".to_string() }
-                else if raw.contains("HighCard") { "High Card".to_string() }
-                else if raw.contains("Pair") && !raw.contains("TwoPair") { "One Pair".to_string() }
-                else if raw.contains("TwoPair") { "Two Pair".to_string() }
-                else if raw.contains("ThreeOfAKind") { "Three of a Kind".to_string() }
-                else if raw.contains("Straight") && !raw.contains("Flush") { "Straight".to_string() }
-                else if raw.contains("Flush") && !raw.contains("Straight") { "Flush".to_string() }
-                else if raw.contains("FullHouse") { "Full House".to_string() }
-                else if raw.contains("FourOfAKind") { "Four of a Kind".to_string() }
-                else if raw.contains("StraightFlush") { "Straight Flush".to_string() }
-                else { raw.to_string() }
-            },
+                if raw.contains("Everyone else folded") || raw.contains("everyone else folded") {
+                    "Everyone else folded".to_string()
+                } else if raw.contains("HighCard") {
+                    "High Card".to_string()
+                } else if raw.contains("Pair") && !raw.contains("TwoPair") {
+                    "One Pair".to_string()
+                } else if raw.contains("TwoPair") {
+                    "Two Pair".to_string()
+                } else if raw.contains("ThreeOfAKind") {
+                    "Three of a Kind".to_string()
+                } else if raw.contains("Straight") && !raw.contains("Flush") {
+                    "Straight".to_string()
+                } else if raw.contains("Flush") && !raw.contains("Straight") {
+                    "Flush".to_string()
+                } else if raw.contains("FullHouse") {
+                    "Full House".to_string()
+                } else if raw.contains("FourOfAKind") {
+                    "Four of a Kind".to_string()
+                } else if raw.contains("StraightFlush") {
+                    "Straight Flush".to_string()
+                } else {
+                    raw.to_string()
+                }
+            }
             Language::Portuguese => {
-                if raw.contains("Everyone else folded") || raw.contains("everyone else folded") { "Todos os outros correram".to_string() }
-                else if raw.contains("HighCard") { "Carta Alta".to_string() }
-                else if raw.contains("Pair") && !raw.contains("TwoPair") { "Um Par".to_string() }
-                else if raw.contains("TwoPair") { "Dois Pares".to_string() }
-                else if raw.contains("ThreeOfAKind") { "Trinca".to_string() }
-                else if raw.contains("Straight") && !raw.contains("Flush") { "Sequência".to_string() }
-                else if raw.contains("Flush") && !raw.contains("Straight") { "Flush".to_string() }
-                else if raw.contains("FullHouse") { "Full House".to_string() }
-                else if raw.contains("FourOfAKind") { "Quadra".to_string() }
-                else if raw.contains("StraightFlush") { "Straight Flush".to_string() }
-                else { raw.to_string() }
-            },
+                if raw.contains("Everyone else folded") || raw.contains("everyone else folded") {
+                    "Todos os outros correram".to_string()
+                } else if raw.contains("HighCard") {
+                    "Carta Alta".to_string()
+                } else if raw.contains("Pair") && !raw.contains("TwoPair") {
+                    "Um Par".to_string()
+                } else if raw.contains("TwoPair") {
+                    "Dois Pares".to_string()
+                } else if raw.contains("ThreeOfAKind") {
+                    "Trinca".to_string()
+                } else if raw.contains("Straight") && !raw.contains("Flush") {
+                    "Sequência".to_string()
+                } else if raw.contains("Flush") && !raw.contains("Straight") {
+                    "Flush".to_string()
+                } else if raw.contains("FullHouse") {
+                    "Full House".to_string()
+                } else if raw.contains("FourOfAKind") {
+                    "Quadra".to_string()
+                } else if raw.contains("StraightFlush") {
+                    "Straight Flush".to_string()
+                } else {
+                    raw.to_string()
+                }
+            }
         }
     }
 
@@ -185,7 +215,7 @@ impl I18n {
                 } else {
                     format!("{}'s CARDS:", player_name)
                 }
-            },
+            }
             Language::Portuguese => {
                 if is_human {
                     "Suas CARTAS:".to_string()

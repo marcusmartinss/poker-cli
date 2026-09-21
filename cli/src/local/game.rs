@@ -1,24 +1,33 @@
+use crate::event_logger::process_events;
+use crate::i18n::I18n;
+use crate::ui;
+use engine::event::{GamePhase, PlayerAction};
+use engine::player::Player;
+use engine::state::GameState;
 use std::io::{self, Write};
 use std::thread;
 use std::time::Duration;
-use engine::state::GameState;
-use engine::player::Player;
-use engine::event::{GamePhase, PlayerAction};
-use crate::i18n::I18n;
-use crate::ui;
-use crate::event_logger::process_events;
 
 pub fn play_local(i18n: &I18n) {
     let mut game = GameState::new();
 
     use std::time::{SystemTime, UNIX_EPOCH};
-    let is_third_aggressive = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() % 2 == 0;
+    let is_third_aggressive = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis()
+        % 2
+        == 0;
     let bot3_id = if is_third_aggressive { 4 } else { 3 }; // 4 = Aggressive, 3 = Conservative
 
-    game.players.push(Player::new(0, i18n.t("human_name").to_string(), 1000));
-    game.players.push(Player::new(1, "Bot Alice".to_string(), 1000));
-    game.players.push(Player::new(2, "Bot Bob".to_string(), 1000));
-    game.players.push(Player::new(bot3_id, "Bot Charlie".to_string(), 1000));
+    game.players
+        .push(Player::new(0, i18n.t("human_name").to_string(), 1000));
+    game.players
+        .push(Player::new(1, "Bot Alice".to_string(), 1000));
+    game.players
+        .push(Player::new(2, "Bot Bob".to_string(), 1000));
+    game.players
+        .push(Player::new(bot3_id, "Bot Charlie".to_string(), 1000));
 
     loop {
         print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
@@ -26,7 +35,7 @@ pub fn play_local(i18n: &I18n) {
         println!("              {}                ", i18n.t("new_hand"));
         println!("--------------------------------------");
         let _ = std::io::Write::flush(&mut std::io::stdout());
-        std::thread::sleep(std::time::Duration::from_millis(1500));
+        std::thread::sleep(std::time::Duration::from_millis(2500));
 
         let mut action_log: Vec<String> = Vec::new();
 
@@ -40,32 +49,40 @@ pub fn play_local(i18n: &I18n) {
 
         while game.phase != GamePhase::Finished {
             let p_index = game.current_turn;
-            
+
             // Extract properties to avoid holding borrow during mutable operations
             let active_id = game.players[p_index].id;
             let active_chips = game.players[p_index].chips;
             let active_bet = game.players[p_index].current_bet;
             let active_name = game.players[p_index].name.clone();
             let active_hole_cards = game.players[p_index].hole_cards.clone();
-            
-            let num_opponents = game.players.iter().filter(|p| !p.is_folded && p.id != active_id).count();
+
+            let num_opponents = game
+                .players
+                .iter()
+                .filter(|p| !p.is_folded && p.id != active_id)
+                .count();
 
             if active_id == 0 {
                 ui::render_table(&i18n, &game);
-                
+
                 println!("  {}", i18n.t("recent_actions"));
-                let recent = if action_log.len() > 5 { &action_log[action_log.len()-5..] } else { &action_log[..] };
+                let recent = if action_log.len() > 5 {
+                    &action_log[action_log.len() - 5..]
+                } else {
+                    &action_log[..]
+                };
                 for msg in recent {
                     println!("   > {}", msg);
                 }
                 println!("---------------------------------------------------------\n");
-                
+
                 println!("{}\n", i18n.t("your_turn"));
-                
+
                 if active_hole_cards.len() == 2 {
                     let mut my_cards = game.community_cards.clone();
                     my_cards.extend(active_hole_cards.clone());
-                    
+
                     let raw_hand = if my_cards.len() == 2 {
                         if my_cards[0].rank == my_cards[1].rank {
                             "Pair".to_string()
@@ -78,7 +95,7 @@ pub fn play_local(i18n: &I18n) {
                             Err(_) => "".to_string(),
                         }
                     };
-                    
+
                     println!("{} ({})", i18n.t("your_cards"), i18n.t_hand(&raw_hand));
                     ui::draw_cards_ascii(&active_hole_cards, false);
                 }
@@ -86,15 +103,29 @@ pub fn play_local(i18n: &I18n) {
                 if let Some(action) = handle_human_turn(&game, active_chips, active_bet, &i18n) {
                     match game.process_action(active_id, action) {
                         Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
-                        Err(e) => action_log.push(format!("{} {}", i18n.t("invalid_move"), i18n.t(e))),
+                        Err(e) => {
+                            action_log.push(format!("{} {}", i18n.t("invalid_move"), i18n.t(e)))
+                        }
                     }
                 }
             } else {
-                let action = handle_bot_turn(&game, active_id, active_chips, active_bet, &active_name, &active_hole_cards, num_opponents);
+                let action = handle_bot_turn(
+                    &game,
+                    active_id,
+                    active_chips,
+                    active_bet,
+                    &active_name,
+                    &active_hole_cards,
+                    num_opponents,
+                );
                 match game.process_action(active_id, action.clone()) {
                     Ok(events) => process_events(&events, &game, &mut action_log, &i18n),
                     Err(_) => {
-                        let fallback = if (game.current_highest_bet - active_bet) > 0 { PlayerAction::Call } else { PlayerAction::Check };
+                        let fallback = if (game.current_highest_bet - active_bet) > 0 {
+                            PlayerAction::Call
+                        } else {
+                            PlayerAction::Check
+                        };
                         if let Ok(events) = game.process_action(active_id, fallback) {
                             process_events(&events, &game, &mut action_log, &i18n);
                         } else {
@@ -108,9 +139,13 @@ pub fn play_local(i18n: &I18n) {
 
         ui::render_table(&i18n, &game);
         ui::render_showdown(&i18n, &game);
-        
+
         println!("  {}", i18n.t("final_actions"));
-        let recent = if action_log.len() > 8 { &action_log[action_log.len()-8..] } else { &action_log[..] };
+        let recent = if action_log.len() > 8 {
+            &action_log[action_log.len() - 8..]
+        } else {
+            &action_log[..]
+        };
         for msg in recent {
             println!("   > {}", msg);
         }
@@ -122,7 +157,12 @@ pub fn play_local(i18n: &I18n) {
     }
 }
 
-fn handle_human_turn(game: &GameState, active_chips: u32, active_bet: u32, i18n: &I18n) -> Option<PlayerAction> {
+fn handle_human_turn(
+    game: &GameState,
+    active_chips: u32,
+    active_bet: u32,
+    i18n: &I18n,
+) -> Option<PlayerAction> {
     println!("{}", i18n.t("actions_menu"));
     print!("{}", i18n.t("action_prompt"));
     let _ = io::stdout().flush();
@@ -141,7 +181,7 @@ fn handle_human_turn(game: &GameState, active_chips: u32, active_bet: u32, i18n:
             let mut amt_input = String::new();
             let _ = io::stdin().read_line(&mut amt_input);
             let amt_trim = amt_input.trim().to_lowercase();
-            
+
             let call_amt = game.current_highest_bet - active_bet;
 
             if amt_trim == "all" {
@@ -156,7 +196,7 @@ fn handle_human_turn(game: &GameState, active_chips: u32, active_bet: u32, i18n:
                 println!("{}", i18n.t("invalid_amount"));
                 None
             }
-        },
+        }
         _ => {
             println!("{}", i18n.t("unknown_cmd"));
             None
@@ -175,7 +215,7 @@ fn handle_bot_turn(
 ) -> PlayerAction {
     let amount_to_call = game.current_highest_bet - active_bet;
     let is_aggressive = active_id % 2 == 0;
-    
+
     let win_rate = if num_opponents > 0 {
         engine::ai::calculate_win_rate(
             active_hole_cards,
@@ -186,7 +226,7 @@ fn handle_bot_turn(
     } else {
         1.0
     };
-    
+
     let base_win_rate = 1.0 / (num_opponents as f64 + 1.0);
     let (raise_threshold, call_threshold) = if is_aggressive {
         (base_win_rate + 0.05, base_win_rate - 0.15)

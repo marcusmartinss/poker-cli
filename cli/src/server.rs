@@ -1,12 +1,12 @@
-use std::net::{TcpListener, TcpStream};
-use std::io::{Read, Write};
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
-use std::thread;
-use crate::net_messages::{ClientMessage, ServerMessage, RoomInfo};
-use engine::state::GameState;
-use engine::player::Player;
+use crate::net_messages::{ClientMessage, RoomInfo, ServerMessage};
 use engine::event::GameEvent;
+use engine::player::Player;
+use engine::state::GameState;
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 #[allow(dead_code)]
 struct ClientConnection {
@@ -35,7 +35,7 @@ struct ServerState {
 #[allow(dead_code)]
 pub fn start_server(port: u16) {
     let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).unwrap();
-    
+
     // UDP Discovery Server
     if let Ok(udp_socket) = std::net::UdpSocket::bind("0.0.0.0:8081") {
         thread::spawn(move || {
@@ -74,25 +74,26 @@ fn handle_client(mut stream: TcpStream, state: Arc<Mutex<ServerState>>) {
         let mut s = state.lock().unwrap();
         client_id = s.next_client_id;
         s.next_client_id += 1;
-        s.clients.insert(client_id, ClientConnection {
-            name: format!("Guest{}", client_id),
-            stream: write_stream,
-            room_id: None,
-        });
+        s.clients.insert(
+            client_id,
+            ClientConnection {
+                name: format!("Guest{}", client_id),
+                stream: write_stream,
+                room_id: None,
+            },
+        );
     }
 
-    let mut buffer = [0; 4096];
+    let mut reader = std::io::BufReader::new(stream);
+    let mut line = String::new();
     loop {
-        match stream.read(&mut buffer) {
+        match std::io::BufRead::read_line(&mut reader, &mut line) {
             Ok(0) => break,
-            Ok(n) => {
-                let msg_str = String::from_utf8_lossy(&buffer[..n]);
-                for line in msg_str.lines() {
-                    if line.trim().is_empty() { continue; }
-                    if let Ok(msg) = serde_json::from_str::<ClientMessage>(line) {
-                        process_message(client_id, msg, &state);
-                    }
+            Ok(_) => {
+                if let Ok(msg) = serde_json::from_str::<ClientMessage>(line.trim()) {
+                    process_message(client_id, msg, &state);
                 }
+                line.clear();
             }
             Err(_) => break,
         }
@@ -101,18 +102,20 @@ fn handle_client(mut stream: TcpStream, state: Arc<Mutex<ServerState>>) {
     let mut s = state.lock().unwrap();
     if let Some(client) = s.clients.remove(&client_id) {
         if let Some(room_id) = client.room_id {
-            
             // Phase 1: Update the room without broadcasting
             let (is_playing, events_to_broadcast) = if let Some(room) = s.rooms.get_mut(&room_id) {
                 room.players.retain(|&id| id != client_id);
-                
-                let is_playing = room.state.phase != engine::event::GamePhase::WaitingForPlayers 
-                              && room.state.phase != engine::event::GamePhase::Finished;
-                
+
+                let is_playing = room.state.phase != engine::event::GamePhase::WaitingForPlayers
+                    && room.state.phase != engine::event::GamePhase::Finished;
+
                 let mut events_out = None;
                 if is_playing {
                     // Try to auto-fold them
-                    if let Ok(events) = room.state.process_action(client_id, engine::event::PlayerAction::Fold) {
+                    if let Ok(events) = room
+                        .state
+                        .process_action(client_id, engine::event::PlayerAction::Fold)
+                    {
                         events_out = Some(events);
                     }
                     // Mark as folded and 0 chips to effectively remove them from future rounds
@@ -149,14 +152,23 @@ fn send_to_client(s: &mut ServerState, client_id: usize, msg: &ServerMessage) {
 
 fn broadcast_room_state(s: &mut ServerState, room_id: u32) {
     let (players_clone, host_id, bot_names) = if let Some(room) = s.rooms.get(&room_id) {
-        let bots = room.state.players.iter().filter(|p| p.id >= 1000).map(|p| p.name.clone()).collect::<Vec<_>>();
+        let bots = room
+            .state
+            .players
+            .iter()
+            .filter(|p| p.id >= 1000)
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>();
         (room.players.clone(), room.host_id, bots)
     } else {
         return;
     };
 
     for &id in &players_clone {
-        let mut players_str: Vec<String> = players_clone.iter().map(|pid| s.clients.get(pid).unwrap().name.clone()).collect();
+        let mut players_str: Vec<String> = players_clone
+            .iter()
+            .map(|pid| s.clients.get(pid).unwrap().name.clone())
+            .collect();
         players_str.extend(bot_names.clone());
         let msg = ServerMessage::RoomState {
             room_id,
@@ -173,27 +185,41 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
         ClientMessage::JoinServer { name } => {
             let name_taken = s.clients.values().any(|c| c.name == name);
             if name_taken {
-                send_to_client(&mut s, client_id, &ServerMessage::Error("Nome já está em uso.".to_string()));
+                send_to_client(
+                    &mut s,
+                    client_id,
+                    &ServerMessage::Error("Nome já está em uso.".to_string()),
+                );
             } else {
                 if let Some(client) = s.clients.get_mut(&client_id) {
                     client.name = name;
                 }
-                send_to_client(&mut s, client_id, &ServerMessage::Welcome { player_id: client_id });
-                
-                let rooms = s.rooms.values().map(|r| RoomInfo {
-                    id: r.id,
-                    name: r.name.clone(),
-                    player_count: r.players.len(),
-                    max_players: 8,
-                    has_started: r.state.phase != engine::event::GamePhase::WaitingForPlayers,
-                }).collect();
+                send_to_client(
+                    &mut s,
+                    client_id,
+                    &ServerMessage::Welcome {
+                        player_id: client_id,
+                    },
+                );
+
+                let rooms = s
+                    .rooms
+                    .values()
+                    .map(|r| RoomInfo {
+                        id: r.id,
+                        name: r.name.clone(),
+                        player_count: r.players.len(),
+                        max_players: 8,
+                        has_started: r.state.phase != engine::event::GamePhase::WaitingForPlayers,
+                    })
+                    .collect();
                 send_to_client(&mut s, client_id, &ServerMessage::LobbyState { rooms });
             }
         }
         ClientMessage::CreateRoom { room_name } => {
             let room_id = s.next_room_id;
             s.next_room_id += 1;
-            
+
             let room = Room {
                 id: room_id,
                 name: room_name,
@@ -201,18 +227,22 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                 players: vec![client_id],
                 state: GameState::new(),
             };
-            
+
             s.rooms.insert(room_id, room);
             if let Some(client) = s.clients.get_mut(&client_id) {
                 client.room_id = Some(room_id);
             }
-            
+
             broadcast_room_state(&mut s, room_id);
         }
         ClientMessage::JoinRoom { room_id } => {
             if let Some(room) = s.rooms.get_mut(&room_id) {
                 if room.players.len() >= 8 {
-                    send_to_client(&mut s, client_id, &ServerMessage::Error("Sala cheia.".to_string()));
+                    send_to_client(
+                        &mut s,
+                        client_id,
+                        &ServerMessage::Error("Sala cheia.".to_string()),
+                    );
                 } else {
                     room.players.push(client_id);
                     if let Some(client) = s.clients.get_mut(&client_id) {
@@ -221,7 +251,11 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                     broadcast_room_state(&mut s, room_id);
                 }
             } else {
-                send_to_client(&mut s, client_id, &ServerMessage::Error("Sala não encontrada.".to_string()));
+                send_to_client(
+                    &mut s,
+                    client_id,
+                    &ServerMessage::Error("Sala não encontrada.".to_string()),
+                );
             }
         }
         ClientMessage::AddBot => {
@@ -229,8 +263,10 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                 if let Some(room_id) = client.room_id {
                     let room = s.rooms.get_mut(&room_id).unwrap();
                     if room.host_id == client_id {
-                        let bot_names = ["Bot Alice", "Bot Bob", "Bot Charlie", "Bot Dave", "Bot Eve"];
-                        let bot_name = bot_names[room.state.players.len() % bot_names.len()].to_string();
+                        let bot_names =
+                            ["Bot Alice", "Bot Bob", "Bot Charlie", "Bot Dave", "Bot Eve"];
+                        let bot_name =
+                            bot_names[room.state.players.len() % bot_names.len()].to_string();
                         let bot_id = 1000 + room.state.players.len();
                         room.state.players.push(Player::new(bot_id, bot_name, 1000));
                         broadcast_room_state(&mut s, room_id);
@@ -243,33 +279,40 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                 if let Some(room_id) = client.room_id {
                     let room_players: Vec<usize> = s.rooms.get(&room_id).unwrap().players.clone();
                     let host_id = s.rooms.get(&room_id).unwrap().host_id;
-                    
+
                     if host_id == client_id {
                         let mut player_names = Vec::new();
                         for &pid in &room_players {
                             player_names.push((pid, s.clients.get(&pid).unwrap().name.clone()));
                         }
-                        
+
                         let room = s.rooms.get_mut(&room_id).unwrap();
-                        
+
                         if room.state.phase == engine::event::GamePhase::Finished {
                             room.state.players.retain(|p| p.chips > 0);
                             if room.state.players.len() > 1 {
-                                room.state.dealer_button = (room.state.dealer_button + 1) % room.state.players.len();
+                                room.state.dealer_button =
+                                    (room.state.dealer_button + 1) % room.state.players.len();
                             }
                         }
-                        
+
                         for (pid, name) in player_names {
                             if !room.state.players.iter().any(|p| p.id == pid) {
                                 room.state.players.push(Player::new(pid, name, 1000));
                             }
                         }
-                        
+
                         if room.state.players.len() < 2 {
-                            send_to_client(&mut s, client_id, &ServerMessage::Error("Not enough players with chips to start.".to_string()));
+                            send_to_client(
+                                &mut s,
+                                client_id,
+                                &ServerMessage::Error(
+                                    "Not enough players with chips to start.".to_string(),
+                                ),
+                            );
                             return;
                         }
-                        
+
                         if let Ok(events) = room.state.start_game() {
                             broadcast_game_update(&mut s, room_id, events);
                             process_bot_turns(&mut s, room_id);
@@ -322,7 +365,9 @@ fn process_bot_turns(s: &mut ServerState, room_id: u32) {
                 None => return,
             };
 
-            if room.state.phase == engine::event::GamePhase::WaitingForPlayers || room.state.phase == engine::event::GamePhase::Finished {
+            if room.state.phase == engine::event::GamePhase::WaitingForPlayers
+                || room.state.phase == engine::event::GamePhase::Finished
+            {
                 return;
             }
 
@@ -332,12 +377,17 @@ fn process_bot_turns(s: &mut ServerState, room_id: u32) {
             }
 
             let active_id = active_player.id;
-            let num_opponents = room.state.players.iter().filter(|p| p.chips > 0 && !p.is_folded && p.id != active_id).count();
+            let num_opponents = room
+                .state
+                .players
+                .iter()
+                .filter(|p| p.chips > 0 && !p.is_folded && p.id != active_id)
+                .count();
             let amount_to_call = room.state.current_highest_bet - active_player.current_bet;
             let active_chips = active_player.chips;
-            
+
             let is_aggressive = active_id % 2 == 0;
-            
+
             let win_rate = if num_opponents > 0 {
                 engine::ai::calculate_win_rate(
                     &active_player.hole_cards,
@@ -348,7 +398,7 @@ fn process_bot_turns(s: &mut ServerState, room_id: u32) {
             } else {
                 1.0
             };
-            
+
             let base_win_rate = 1.0 / (num_opponents as f64 + 1.0);
             let (raise_threshold, call_threshold) = if is_aggressive {
                 (base_win_rate + 0.05, base_win_rate - 0.15)
@@ -372,10 +422,17 @@ fn process_bot_turns(s: &mut ServerState, room_id: u32) {
             let evts = match room.state.process_action(active_id, action) {
                 Ok(e) => e,
                 Err(_) => {
-                    let fallback = if amount_to_call > 0 { engine::event::PlayerAction::Call } else { engine::event::PlayerAction::Check };
+                    let fallback = if amount_to_call > 0 {
+                        engine::event::PlayerAction::Call
+                    } else {
+                        engine::event::PlayerAction::Check
+                    };
                     match room.state.process_action(active_id, fallback) {
                         Ok(e) => e,
-                        Err(_) => room.state.process_action(active_id, engine::event::PlayerAction::Fold).unwrap_or_default(),
+                        Err(_) => room
+                            .state
+                            .process_action(active_id, engine::event::PlayerAction::Fold)
+                            .unwrap_or_default(),
                     }
                 }
             };
@@ -389,4 +446,3 @@ fn process_bot_turns(s: &mut ServerState, room_id: u32) {
         }
     }
 }
-

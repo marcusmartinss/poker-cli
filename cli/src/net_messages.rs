@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
 use engine::event::{GameEvent, PlayerAction};
 use engine::state::GameState;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RoomInfo {
@@ -24,7 +24,9 @@ pub enum ClientMessage {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ServerMessage {
     Error(String),
-    Welcome { player_id: usize },
+    Welcome {
+        player_id: usize,
+    },
     LobbyState {
         rooms: Vec<RoomInfo>,
     },
