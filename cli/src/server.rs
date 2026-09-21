@@ -336,6 +336,17 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                 }
             }
         }
+        ClientMessage::Chat(message) => {
+            let sender = if let Some(c) = s.clients.get(&client_id) { c.name.clone() } else { String::new() };
+            if let Some(room_id) = s.clients.get(&client_id).and_then(|c| c.room_id) {
+                if let Some(room) = s.rooms.get(&room_id) {
+                    let players = room.players.clone();
+                    for p_id in players {
+                        send_to_client(&mut s, p_id, &ServerMessage::Chat { sender: sender.clone(), message: message.clone() });
+                    }
+                }
+            }
+        }
     }
 }
 

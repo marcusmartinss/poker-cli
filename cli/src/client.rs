@@ -85,6 +85,13 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
     loop {
         // Handle User Input
         if let Ok(input) = input_rx.try_recv() {
+            if input.starts_with("/c ") {
+                let msg = input.trim_start_matches("/c ").trim();
+                if !msg.is_empty() {
+                    send_msg(ClientMessage::Chat(msg.to_string()));
+                }
+                continue;
+            }
             match mode {
                 InputMode::Name => {
                     send_msg(ClientMessage::JoinServer {
@@ -372,6 +379,37 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                             }
                         }
                     }
+                }
+                ServerMessage::Chat { sender, message } => {
+                    print!("{esc}[2K\x0D", esc = 27 as char);
+                    println!("[CHAT] {}: {}", sender, message);
+                    if matches!(mode, InputMode::Name) {
+                        print!("Enter your name: ");
+                    } else if matches!(mode, InputMode::Lobby) {
+                        print!("\nChoose an option: ");
+                    } else if matches!(mode, InputMode::LobbyCreatingRoom) {
+                        print!("Room name: ");
+                    } else if matches!(mode, InputMode::LobbyJoiningRoom) {
+                        print!("Room ID to join: ");
+                    } else if matches!(mode, InputMode::RoomHost) {
+                        print!("\n=> ");
+                    } else if matches!(mode, InputMode::RoomGuest) || matches!(mode, InputMode::GamePlay) || matches!(mode, InputMode::GamePlayRaising) {
+                        // In game modes
+                        if let Some(game) = &game_state_opt {
+                            if game.phase == engine::event::GamePhase::Finished {
+                                print!("{}", i18n.t("press_enter"));
+                            } else if game.current_turn < game.players.len() && game.players[game.current_turn].id == my_id {
+                                if let Some(me) = game.players.iter().find(|p| p.id == my_id) {
+                                    if matches!(mode, InputMode::GamePlayRaising) {
+                                        print!("{} (Min: {}): ", i18n.t("raise_prompt").trim_end_matches(": "), game.min_raise);
+                                    } else {
+                                        print!("{}", i18n.t("action_prompt"));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    let _ = std::io::Write::flush(&mut std::io::stdout());
                 }
             }
         }

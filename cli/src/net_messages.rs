@@ -19,11 +19,16 @@ pub enum ClientMessage {
     AddBot,
     StartGame,
     Action(PlayerAction),
+    Chat(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ServerMessage {
     Error(String),
+    Chat {
+        sender: String,
+        message: String,
+    },
     Welcome {
         player_id: usize,
     },
