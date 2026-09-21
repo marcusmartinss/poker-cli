@@ -289,10 +289,9 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                         let room = s.rooms.get_mut(&room_id).unwrap();
 
                         if room.state.phase == engine::event::GamePhase::Finished {
-                            room.state.players.retain(|p| p.chips > 0);
+                            
                             if room.state.players.len() > 1 {
-                                room.state.dealer_button =
-                                    (room.state.dealer_button + 1) % room.state.players.len();
+                                room.state.dealer_button = room.state.next_active_player(room.state.dealer_button);
                             }
                         }
 

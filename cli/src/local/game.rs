@@ -249,7 +249,7 @@ fn handle_bot_turn(
 }
 
 fn handle_end_of_hand(game: &mut GameState, i18n: &I18n) -> bool {
-    game.players.retain(|p| p.chips > 0);
+    
     if game.players.len() == 1 {
         println!("\n  >>> PARABÉNS! {} <<<", i18n.t("you_won_game"));
         return true;
@@ -260,6 +260,6 @@ fn handle_end_of_hand(game: &mut GameState, i18n: &I18n) -> bool {
     let mut _input = String::new();
     let _ = io::stdin().read_line(&mut _input);
 
-    game.dealer_button = (game.dealer_button + 1) % game.players.len();
+    game.dealer_button = game.next_active_player(game.dealer_button);
     false
 }

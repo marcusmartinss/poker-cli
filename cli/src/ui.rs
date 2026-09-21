@@ -83,7 +83,9 @@ pub fn render_table(i18n: &crate::i18n::I18n, game: &GameState) {
 
         let active_token = if game.current_turn == i { "=>" } else { "  " };
 
-        let status = if p.is_folded {
+        let status = if p.chips == 0 && !p.is_all_in {
+            i18n.t("eliminated")
+        } else if p.is_folded {
             i18n.t("folded")
         } else if p.is_all_in {
             i18n.t("all_in")

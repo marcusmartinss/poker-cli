@@ -35,9 +35,46 @@ impl GameState {
         self.players.push(Player::new(id, name, chips));
     }
 
+    pub fn next_active_player(&self, mut current_index: usize) -> usize {
+        loop {
+            current_index = (current_index + 1) % self.players.len();
+            if self.players[current_index].chips > 0 {
+                return current_index;
+            }
+        }
+    }
+
     pub fn start_game(&mut self) -> Result<Vec<GameEvent>, &'static str> {
-        if self.players.len() < 2 {
-            return Err("Not enough players to start.");
+        let active_count = self.players.iter().filter(|p| p.chips > 0).count();
+        if active_count < 2 {
+            return Err("Not enough players with chips to start.");
+        }
+
+        self.phase = GamePhase::PreFlop;
+        self.deck = Deck::new();
+        self.community_cards.clear();
+        self.pot = 0;
+        self.current_highest_bet = 0;
+        self.min_raise = 20; // Default minimum raise is big blind
+
+        for player in &mut self.players {
+            player.has_acted = false;
+            player.current_bet = 0;
+            player.hole_cards.clear();
+            
+            if player.chips == 0 {
+                player.is_folded = true;
+                player.is_all_in = false;
+            } else {
+                player.is_folded = false;
+                player.is_all_in = false;
+                if let Some(c1) = self.deck.draw() {
+                    player.hole_cards.push(c1);
+                }
+                if let Some(c2) = self.deck.draw() {
+                    player.hole_cards.push(c2);
+                }
+            }
         }
 
         self.phase = GamePhase::PreFlop;
@@ -62,8 +99,8 @@ impl GameState {
         }
 
         // Apply Blinds
-        let sb_index = (self.dealer_button + 1) % self.players.len();
-        let bb_index = (self.dealer_button + 2) % self.players.len();
+        let sb_index = self.next_active_player(self.dealer_button);
+        let bb_index = self.next_active_player(sb_index);
 
         self.apply_forced_bet(sb_index, 10);
         self.apply_forced_bet(bb_index, 20);
@@ -71,7 +108,7 @@ impl GameState {
         self.min_raise = 20;
 
         // Turn starts with the player after the Big Blind (UTG)
-        self.current_turn = (self.dealer_button + 3) % self.players.len();
+        self.current_turn = self.next_active_player(bb_index);
 
         Ok(vec![
             GameEvent::GameStarted,
