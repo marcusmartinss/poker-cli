@@ -1,7 +1,7 @@
 use crate::card::Card;
 use crate::deck::Deck;
+use crate::event::{GameEvent, GamePhase, PlayerAction};
 use crate::player::Player;
-use crate::event::{GamePhase, PlayerAction, GameEvent};
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct GameState {
@@ -37,9 +37,9 @@ impl GameState {
         if self.players.len() < 2 {
             return Err("Not enough players to start.");
         }
-        
+
         self.phase = GamePhase::PreFlop;
-        self.deck = Deck::new(); 
+        self.deck = Deck::new();
         self.community_cards.clear();
         self.pot = 0;
         self.current_highest_bet = 0;
@@ -50,14 +50,18 @@ impl GameState {
             player.has_acted = false;
             player.current_bet = 0;
             player.hole_cards.clear();
-            if let Some(c1) = self.deck.draw() { player.hole_cards.push(c1); }
-            if let Some(c2) = self.deck.draw() { player.hole_cards.push(c2); }
+            if let Some(c1) = self.deck.draw() {
+                player.hole_cards.push(c1);
+            }
+            if let Some(c2) = self.deck.draw() {
+                player.hole_cards.push(c2);
+            }
         }
 
         // Apply Blinds
         let sb_index = (self.dealer_button + 1) % self.players.len();
         let bb_index = (self.dealer_button + 2) % self.players.len();
-        
+
         self.apply_forced_bet(sb_index, 10);
         self.apply_forced_bet(bb_index, 20);
         self.current_highest_bet = 20;
@@ -65,10 +69,17 @@ impl GameState {
         // Turn starts with the player after the Big Blind (UTG)
         self.current_turn = (self.dealer_button + 3) % self.players.len();
 
-        Ok(vec![GameEvent::GameStarted, GameEvent::PhaseChanged(self.phase)])
+        Ok(vec![
+            GameEvent::GameStarted,
+            GameEvent::PhaseChanged(self.phase),
+        ])
     }
 
-    pub fn process_action(&mut self, player_id: usize, action: PlayerAction) -> Result<Vec<GameEvent>, &'static str> {
+    pub fn process_action(
+        &mut self,
+        player_id: usize,
+        action: PlayerAction,
+    ) -> Result<Vec<GameEvent>, &'static str> {
         if self.phase == GamePhase::WaitingForPlayers || self.phase == GamePhase::Finished {
             return Err("Game is not active.");
         }
@@ -103,10 +114,16 @@ impl GameState {
         p.chips -= actual;
         p.current_bet += actual;
         self.pot += actual;
-        if p.chips == 0 { p.is_all_in = true; }
+        if p.chips == 0 {
+            p.is_all_in = true;
+        }
     }
 
-    fn apply_action(&mut self, player_index: usize, action: &PlayerAction) -> Result<(), &'static str> {
+    fn apply_action(
+        &mut self,
+        player_index: usize,
+        action: &PlayerAction,
+    ) -> Result<(), &'static str> {
         let player = &mut self.players[player_index];
         player.has_acted = true;
 
@@ -122,11 +139,11 @@ impl GameState {
             PlayerAction::Call => {
                 let amount_to_call = self.current_highest_bet - player.current_bet;
                 let actual_call = amount_to_call.min(player.chips);
-                
+
                 player.chips -= actual_call;
                 player.current_bet += actual_call;
                 self.pot += actual_call;
-                
+
                 if player.chips == 0 {
                     player.is_all_in = true;
                 }
@@ -141,11 +158,11 @@ impl GameState {
                 player.current_bet += total_needed;
                 self.pot += total_needed;
                 self.current_highest_bet = player.current_bet;
-                
+
                 if player.chips == 0 {
                     player.is_all_in = true;
                 }
-                
+
                 for (i, p) in self.players.iter_mut().enumerate() {
                     if i != player_index && !p.is_folded && !p.is_all_in {
                         p.has_acted = false;
@@ -198,10 +215,16 @@ impl GameState {
             }
             _ => {}
         }
-        
+
         // After dealing cards, the first active player left of the dealer acts
         self.current_turn = self.dealer_button;
         self.advance_turn();
+
+        // If everyone is all-in (or folded), the betting round is instantly complete.
+        // We should recursively advance the phase until Showdown/Finished.
+        if self.phase != GamePhase::Finished && self.is_betting_round_complete() {
+            self.advance_phase(events);
+        }
     }
 
     fn handle_showdown(&mut self, events: &mut Vec<GameEvent>) {
@@ -244,10 +267,14 @@ impl GameState {
                 Some(r) => format!("{:?}", r),
                 None => "Unknown".to_string(),
             };
-            
+
             for &idx in &winners {
                 self.players[idx].chips += split_amount;
-                events.push(GameEvent::PotAwarded(self.players[idx].id, split_amount, hand_desc.clone()));
+                events.push(GameEvent::PotAwarded(
+                    self.players[idx].id,
+                    split_amount,
+                    hand_desc.clone(),
+                ));
             }
         }
 
@@ -274,10 +301,14 @@ impl GameState {
     fn handle_early_win(&mut self, events: &mut Vec<GameEvent>) {
         self.phase = GamePhase::Finished;
         events.push(GameEvent::PhaseChanged(self.phase));
-        
+
         if let Some(winner) = self.players.iter_mut().find(|p| !p.is_folded) {
             winner.chips += self.pot;
-            events.push(GameEvent::PotAwarded(winner.id, self.pot, "Everyone else folded".to_string()));
+            events.push(GameEvent::PotAwarded(
+                winner.id,
+                self.pot,
+                "Everyone else folded".to_string(),
+            ));
         }
     }
 }

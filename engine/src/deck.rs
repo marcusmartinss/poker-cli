@@ -1,6 +1,6 @@
 use crate::card::{Card, Rank, Suit};
-use rand::seq::SliceRandom;
 use rand::rng;
+use rand::seq::SliceRandom;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Deck {
@@ -10,13 +10,13 @@ pub struct Deck {
 impl Deck {
     pub fn new() -> Self {
         let mut cards = Vec::with_capacity(52);
-        
+
         for suit in Suit::all() {
             for rank in Rank::all() {
                 cards.push(Card::new(rank, suit));
             }
         }
-        
+
         let mut deck = Self { cards };
         deck.shuffle();
         deck
