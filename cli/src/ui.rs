@@ -63,10 +63,8 @@ pub fn render_table(i18n: &crate::i18n::I18n, game: &GameState) {
     println!("---------------------------------------------------------");
     println!("  {}", i18n.t("players"));
     println!("  +----+------+-----------------+--------+---------+------------+");
-    println!(
-        "  | {} | Role | Name            | Chips  | Bet     | Status     |",
-        "=>"
-    );
+    let header = i18n.t("table_header").replace("{}", "=>");
+    println!("{}", header);
     println!("  +----+------+-----------------+--------+---------+------------+");
     let num_players = game.players.len();
     for (i, p) in game.players.iter().enumerate() {
