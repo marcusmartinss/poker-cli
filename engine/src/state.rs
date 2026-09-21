@@ -13,6 +13,7 @@ pub struct GameState {
     pub current_turn: usize,
     pub dealer_button: usize,
     pub current_highest_bet: u32,
+    pub min_raise: u32,
 }
 
 impl GameState {
@@ -26,6 +27,7 @@ impl GameState {
             current_turn: 0,
             dealer_button: 0,
             current_highest_bet: 0,
+            min_raise: 20,
         }
     }
 
@@ -43,6 +45,7 @@ impl GameState {
         self.community_cards.clear();
         self.pot = 0;
         self.current_highest_bet = 0;
+        self.min_raise = 20; // Default minimum raise is big blind
 
         for player in &mut self.players {
             player.is_folded = false;
@@ -65,6 +68,7 @@ impl GameState {
         self.apply_forced_bet(sb_index, 10);
         self.apply_forced_bet(bb_index, 20);
         self.current_highest_bet = 20;
+        self.min_raise = 20;
 
         // Turn starts with the player after the Big Blind (UTG)
         self.current_turn = (self.dealer_button + 3) % self.players.len();
@@ -149,7 +153,13 @@ impl GameState {
                 }
             }
             PlayerAction::Raise(amount) => {
-                let total_needed = (self.current_highest_bet - player.current_bet) + amount;
+                let total_needed = (self.current_highest_bet - player.current_bet) + *amount;
+                let is_all_in_raise = player.chips == total_needed;
+                
+                if !is_all_in_raise && *amount < self.min_raise {
+                    return Err("Raise amount is below the minimum allowed raise.");
+                }
+                
                 if player.chips < total_needed {
                     return Err("Not enough chips to raise that amount.");
                 }
@@ -158,6 +168,9 @@ impl GameState {
                 player.current_bet += total_needed;
                 self.pot += total_needed;
                 self.current_highest_bet = player.current_bet;
+                if *amount > self.min_raise {
+                    self.min_raise = *amount;
+                }
 
                 if player.chips == 0 {
                     player.is_all_in = true;
@@ -195,6 +208,7 @@ impl GameState {
             p.has_acted = false;
         }
         self.current_highest_bet = 0;
+        self.min_raise = 20; // Default minimum raise is big blind
 
         match self.phase {
             GamePhase::PreFlop => {

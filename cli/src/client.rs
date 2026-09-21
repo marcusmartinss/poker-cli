@@ -173,7 +173,7 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                                     "2" => send_msg(ClientMessage::Action(PlayerAction::Check)),
                                     "3" => send_msg(ClientMessage::Action(PlayerAction::Call)),
                                     "4" => {
-                                        print!("{}", i18n.t("raise_prompt"));
+                                        print!("{} (Min: {}): ", i18n.t("raise_prompt").trim_end_matches(": "), game.min_raise);
                                         let _ = io::stdout().flush();
                                         mode = InputMode::GamePlayRaising;
                                     }

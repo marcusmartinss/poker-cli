@@ -176,7 +176,7 @@ fn handle_human_turn(
         "2" => Some(PlayerAction::Check),
         "3" => Some(PlayerAction::Call),
         "4" => {
-            print!("{}", i18n.t("raise_prompt"));
+            print!("{} (Min: {}): ", i18n.t("raise_prompt").trim_end_matches(": "), game.min_raise);
             let _ = io::stdout().flush();
             let mut amt_input = String::new();
             let _ = io::stdin().read_line(&mut amt_input);
@@ -234,7 +234,7 @@ fn handle_bot_turn(
         (base_win_rate + 0.15, base_win_rate - 0.05)
     };
 
-    let raise_amount = if is_aggressive { 150 } else { 50 };
+    let raise_amount = std::cmp::max(game.min_raise, if is_aggressive { 150 } else { 50 });
     let total_raise_cost = amount_to_call + raise_amount;
 
     if win_rate > raise_threshold && active_chips >= total_raise_cost {
