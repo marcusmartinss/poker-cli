@@ -66,11 +66,15 @@ pub fn render_table(i18n: &crate::i18n::I18n, game: &GameState) {
     let header = i18n.t("table_header").replace("{}", "=>");
     println!("{}", header);
     println!("  +----+------+-----------------+--------+---------+------------+");
-    let num_players = game.players.len();
+    let _num_players = game.players.len();
+    let active_count = game.players.iter().filter(|p| p.chips > 0 || p.is_all_in).count();
+    let true_sb = if active_count == 2 { game.dealer_button } else { game.next_active_player(game.dealer_button) };
+    let true_bb = if active_count == 2 { game.next_active_player(game.dealer_button) } else { game.next_active_player(true_sb) };
+    
     for (i, p) in game.players.iter().enumerate() {
         let is_dealer = game.dealer_button == i;
-        let is_sb = (game.dealer_button + 1) % num_players == i;
-        let is_bb = (game.dealer_button + 2) % num_players == i;
+        let is_sb = true_sb == i;
+        let is_bb = true_bb == i;
 
         let role_token = if is_dealer {
             "[D]"
