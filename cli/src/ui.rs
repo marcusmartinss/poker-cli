@@ -207,7 +207,7 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
                         let remaining = 15_u64.saturating_sub(elapsed);
                         let color = if remaining <= 5 { ratatui::style::Color::Red } else { ratatui::style::Color::Green };
                         
-                        if game.current_turn == app.my_id {
+                        if game.players[game.current_turn].id == app.my_id {
                             main_text.push(Line::from(Span::styled(format!("SUA VEZ! Tempo restante: {}s", remaining), ratatui::style::Style::default().fg(color).add_modifier(ratatui::style::Modifier::BOLD))));
                             main_text.push(Line::from(""));
                             
