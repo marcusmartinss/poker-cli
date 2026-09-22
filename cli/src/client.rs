@@ -58,6 +58,7 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
     loop {
         // 1. Render UI
         let _ = tui.terminal.draw(|f| ui::render_ratatui(f, &app, i18n));
+        if let Some(time) = app.connection_error_time {             if time.elapsed().as_secs() >= 30 {                 app.connection_error = None;                 app.connection_error_time = None;             }         }         if app.mode == AppMode::GamePlay || app.mode == AppMode::GamePlayRaising {             if let Some(game) = &app.game_state {                 if game.phase != engine::event::GamePhase::Finished && game.phase != engine::event::GamePhase::WaitingForPlayers {                     if game.players[game.current_turn].id == app.my_id {                         if app.turn_start_time.elapsed().as_secs() >= 15 {                             app.turn_start_time = std::time::Instant::now();                             send_msg(ClientMessage::Action(engine::event::PlayerAction::Fold));                         }                     }                 }             }         }
 
         // 2. Poll Input
         if event::poll(Duration::from_millis(16)).unwrap() {

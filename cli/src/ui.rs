@@ -202,25 +202,32 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
                         }
                     }
 
-                    if game.current_turn == app.my_id && game.phase != engine::event::GamePhase::WaitingForPlayers && game.phase != engine::event::GamePhase::Finished {
+                    if game.phase != engine::event::GamePhase::WaitingForPlayers && game.phase != engine::event::GamePhase::Finished {
                         let elapsed = app.turn_start_time.elapsed().as_secs();
                         let remaining = 15_u64.saturating_sub(elapsed);
                         let color = if remaining <= 5 { ratatui::style::Color::Red } else { ratatui::style::Color::Green };
-                        main_text.push(Line::from(Span::styled(format!("SUA VEZ! Tempo restante: {}s", remaining), ratatui::style::Style::default().fg(color).add_modifier(ratatui::style::Modifier::BOLD))));
-                        main_text.push(Line::from(""));
                         
-                        if app.mode == AppMode::GamePlayRaising {
-                            main_text.push(Line::from(format!("Valor para aumentar (min: {}):", game.min_raise)));
-                            main_text.push(Line::from(format!("> {}", app.main_input)));
-                        } else {
-                            let call_amt = game.current_highest_bet - me.current_bet;
-                            let menu_str = if call_amt == 0 {
-                                format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
+                        if game.current_turn == app.my_id {
+                            main_text.push(Line::from(Span::styled(format!("SUA VEZ! Tempo restante: {}s", remaining), ratatui::style::Style::default().fg(color).add_modifier(ratatui::style::Modifier::BOLD))));
+                            main_text.push(Line::from(""));
+                            
+                            if app.mode == AppMode::GamePlayRaising {
+                                main_text.push(Line::from(format!("Valor para aumentar (min: {}):", game.min_raise)));
+                                main_text.push(Line::from(format!("> {}", app.main_input)));
                             } else {
-                                format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
-                            };
-                            main_text.push(Line::from(menu_str));
-                            main_text.push(Line::from(format!("{}> {}", i18n.t("action_prompt"), app.main_input)));
+                                let call_amt = game.current_highest_bet - me.current_bet;
+                                let menu_str = if call_amt == 0 {
+                                    format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
+                                } else {
+                                    format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
+                                };
+                                main_text.push(Line::from(menu_str));
+                                main_text.push(Line::from(format!("{}> {}", i18n.t("action_prompt"), app.main_input)));
+                            }
+                        } else if game.current_turn < game.players.len() {
+                            let current_player_name = &game.players[game.current_turn].name;
+                            main_text.push(Line::from(""));
+                            main_text.push(Line::from(Span::styled(format!("Turno de {}... ({}s)", current_player_name, remaining), ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray))));
                         }
                     }
                 }
