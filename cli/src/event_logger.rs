@@ -21,7 +21,7 @@ pub fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<Stri
                     .map(|c| {
                         let is_red = c.suit == engine::card::Suit::Hearts || c.suit == engine::card::Suit::Diamonds;
                         if is_red {
-                            format!("[31m{}[0m", c.to_string())
+                            format!("{}", c.to_string())
                         } else {
                             c.to_string()
                         }
@@ -48,7 +48,7 @@ pub fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<Stri
                     }
                 }
             }
-            GameEvent::PotAwarded(player_id, amount, _) => {
+            GameEvent::PotAwarded(player_id, amount, reason) => {
                 let name = game
                     .players
                     .iter()
@@ -56,39 +56,25 @@ pub fn process_events(events: &[GameEvent], game: &GameState, log: &mut Vec<Stri
                     .map(|p| p.name.as_str())
                     .unwrap_or("Unknown");
 
-                // Get player cards for the log
-                let local_hand = if let Some(p) = game.players.iter().find(|p| p.id == *player_id) {
-                    if p.hole_cards.is_empty() {
-                        "Unknown".to_string()
-                    } else {
-                        let mut my_cards = game.community_cards.clone();
-                        my_cards.extend(p.hole_cards.clone());
-                        let raw_hand = if my_cards.len() == 2 {
-                            if my_cards[0].rank == my_cards[1].rank {
-                                "Pair".to_string()
-                            } else {
-                                "HighCard".to_string()
-                            }
-                        } else {
-                            match engine::evaluator::evaluate(&my_cards) {
-                                Ok(rank) => format!("{:?}", rank),
-                                Err(_) => "Unknown".to_string(),
-                            }
-                        };
-                        i18n.t_hand(&raw_hand).to_string()
-                    }
+                if reason == "Everyone else folded" {
+                    log.push(format!(
+                        "*** {} {} {} {}! ***",
+                        name,
+                        i18n.t("won"),
+                        amount,
+                        i18n.t("chips")
+                    ));
                 } else {
-                    "Unknown".to_string()
-                };
-
-                log.push(format!(
-                    "*** {} {} {} {} {}! ***",
-                    name,
-                    i18n.t("won"),
-                    amount,
-                    i18n.t("chips_with"),
-                    local_hand.to_uppercase()
-                ));
+                    let hand_translation = i18n.t_hand(reason).to_uppercase();
+                    log.push(format!(
+                        "*** {} {} {} {} {}! ***",
+                        name,
+                        i18n.t("won"),
+                        amount,
+                        i18n.t("chips_with"),
+                        hand_translation
+                    ));
+                }
             }
             _ => {}
         }
