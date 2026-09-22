@@ -14,6 +14,7 @@ pub struct GameState {
     pub dealer_button: usize,
     pub current_highest_bet: u32,
     pub min_raise: u32,
+    pub hands_played: u32,
 }
 
 impl GameState {
@@ -28,6 +29,21 @@ impl GameState {
             dealer_button: 0,
             current_highest_bet: 0,
             min_raise: 20,
+            hands_played: 0,
+        }
+    }
+
+    pub fn get_blinds(&self) -> (u32, u32) {
+        let level = self.hands_played / 5; // Blinds increase every 5 hands
+        match level {
+            0 => (50, 100),
+            1 => (100, 200),
+            2 => (200, 400),
+            3 => (300, 600),
+            4 => (500, 1000),
+            5 => (1000, 2000),
+            6 => (2000, 4000),
+            _ => (5000, 10000),
         }
     }
 
@@ -47,10 +63,11 @@ impl GameState {
     pub fn start_game(&mut self) -> Result<Vec<GameEvent>, &'static str> {
         let active_count = self.players.iter().filter(|p| p.chips > 0).count();
         if active_count < 2 {
-            // Tournament is over, reset everyone to 1000 chips to restart the game
+            // Tournament is over, reset everyone to 10000 chips to restart the game
             for p in &mut self.players {
-                p.chips = 1000;
+                p.chips = 10000;
             }
+            self.hands_played = 0;
         }
 
         self.phase = GamePhase::PreFlop;
@@ -81,39 +98,33 @@ impl GameState {
             }
         }
 
-        self.phase = GamePhase::PreFlop;
-        self.deck = Deck::new();
-        self.community_cards.clear();
-        self.pot = 0;
-        self.current_highest_bet = 0;
-        self.min_raise = 20; // Default minimum raise is big blind
 
-        for player in &mut self.players {
-            player.is_folded = false;
-            player.is_all_in = false;
-            player.has_acted = false;
-            player.current_bet = 0;
-            player.invested_in_hand = 0;
-            player.hole_cards.clear();
-            if let Some(c1) = self.deck.draw() {
-                player.hole_cards.push(c1);
-            }
-            if let Some(c2) = self.deck.draw() {
-                player.hole_cards.push(c2);
-            }
-        }
 
         // Apply Blinds
-        let sb_index = self.next_active_player(self.dealer_button);
-        let bb_index = self.next_active_player(sb_index);
+        let active_count = self.players.iter().filter(|p| !p.is_folded).count();
+        let sb_index;
+        let bb_index;
+        
+        let (sb_amount, bb_amount) = self.get_blinds();
 
-        self.apply_forced_bet(sb_index, 10);
-        self.apply_forced_bet(bb_index, 20);
-        self.current_highest_bet = 20;
-        self.min_raise = 20;
+        if active_count == 2 {
+            // Heads-Up Rules
+            sb_index = self.dealer_button;
+            bb_index = self.next_active_player(self.dealer_button);
+            self.current_turn = sb_index; // Dealer (SB) acts first pre-flop
+        } else {
+            // Normal Rules
+            sb_index = self.next_active_player(self.dealer_button);
+            bb_index = self.next_active_player(sb_index);
+            self.current_turn = self.next_active_player(bb_index); // UTG acts first
+        }
 
-        // Turn starts with the player after the Big Blind (UTG)
-        self.current_turn = self.next_active_player(bb_index);
+        self.apply_forced_bet(sb_index, sb_amount);
+        self.apply_forced_bet(bb_index, bb_amount);
+        self.current_highest_bet = bb_amount;
+        self.min_raise = bb_amount; // Minimum raise is always the BB amount at the start of a betting round
+        
+        self.hands_played += 1;
 
         Ok(vec![
             GameEvent::GameStarted,

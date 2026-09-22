@@ -268,7 +268,7 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                         let bot_name =
                             bot_names[room.state.players.len() % bot_names.len()].to_string();
                         let bot_id = 1000 + room.state.players.len();
-                        room.state.players.push(Player::new(bot_id, bot_name, 1000));
+                        room.state.players.push(Player::new(bot_id, bot_name, 10000));
                         broadcast_room_state(&mut s, room_id);
                     }
                 }
@@ -297,7 +297,7 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
 
                         for (pid, name) in player_names {
                             if !room.state.players.iter().any(|p| p.id == pid) {
-                                room.state.players.push(Player::new(pid, name, 1000));
+                                room.state.players.push(Player::new(pid, name, 10000));
                             }
                         }
 

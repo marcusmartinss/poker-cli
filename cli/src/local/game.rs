@@ -21,13 +21,13 @@ pub fn play_local(i18n: &I18n) {
     let bot3_id = if is_third_aggressive { 4 } else { 3 }; // 4 = Aggressive, 3 = Conservative
 
     game.players
-        .push(Player::new(0, i18n.t("human_name").to_string(), 1000));
+        .push(Player::new(0, i18n.t("human_name").to_string(), 10000));
     game.players
-        .push(Player::new(1, "Bot Alice".to_string(), 1000));
+        .push(Player::new(1, "Bot Alice".to_string(), 10000));
     game.players
-        .push(Player::new(2, "Bot Bob".to_string(), 1000));
+        .push(Player::new(2, "Bot Bob".to_string(), 10000));
     game.players
-        .push(Player::new(bot3_id, "Bot Charlie".to_string(), 1000));
+        .push(Player::new(bot3_id, "Bot Charlie".to_string(), 10000));
 
     loop {
         print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
