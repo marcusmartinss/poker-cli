@@ -92,19 +92,19 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
         AppMode::RoomHost | AppMode::RoomGuest => {
             main_text.push(Line::from("=== WAITING ROOM ==="));
             main_text.push(Line::from("Players connected:"));
-            for name in &app.room_players {
-                main_text.push(Line::from(format!(" - {}", name)));
+            for (name, ready) in &app.room_players {
+                let status = if *ready { "(PRONTO)" } else { "(Aguardando...)" };
+                main_text.push(Line::from(format!(" - {} {}", name, status)));
             }
+            main_text.push(Line::from(""));
             if app.mode == AppMode::RoomHost {
-                main_text.push(Line::from(""));
-                main_text.push(Line::from("Press [s] to Start Game, [b] to Add Bot"));
-                main_text.push(Line::from(format!("> {}", app.main_input)));
+                main_text.push(Line::from("Comandos: [s] Iniciar | [b] Add Bot | [r] Alternar Pronto"));
             } else {
-                main_text.push(Line::from(""));
-                main_text.push(Line::from("Waiting for host to start the game..."));
+                main_text.push(Line::from("Comandos: [r] Alternar Pronto (Aguardando Host iniciar)"));
             }
+            main_text.push(Line::from(format!("> {}", app.main_input)));
         }
-        AppMode::GamePlay => {
+        AppMode::GamePlay | AppMode::GamePlayRaising => {
             if let Some(game) = &app.game_state {
                 main_text.push(Line::from(format!(
                     "{} {} | {} ${} | {} ${}",
@@ -168,14 +168,19 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
                     }
 
                     if game.current_turn == app.my_id && game.phase != engine::event::GamePhase::WaitingForPlayers && game.phase != engine::event::GamePhase::Finished {
-                        let call_amt = game.current_highest_bet - me.current_bet;
-                        let menu_str = if call_amt == 0 {
-                            format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
+                        if app.mode == AppMode::GamePlayRaising {
+                            main_text.push(Line::from(format!("Valor para aumentar (min: {}):", game.min_raise)));
+                            main_text.push(Line::from(format!("> {}", app.main_input)));
                         } else {
-                            format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
-                        };
-                        main_text.push(Line::from(menu_str));
-                        main_text.push(Line::from(format!("{}> {}", i18n.t("action_prompt"), app.main_input)));
+                            let call_amt = game.current_highest_bet - me.current_bet;
+                            let menu_str = if call_amt == 0 {
+                                format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
+                            } else {
+                                format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
+                            };
+                            main_text.push(Line::from(menu_str));
+                            main_text.push(Line::from(format!("{}> {}", i18n.t("action_prompt"), app.main_input)));
+                        }
                     }
                 }
             }

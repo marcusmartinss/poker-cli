@@ -21,6 +21,7 @@ struct Room {
     name: String,
     host_id: usize,
     players: Vec<usize>,
+    ready_players: std::collections::HashSet<usize>,
     state: GameState,
 }
 
@@ -165,12 +166,19 @@ fn broadcast_room_state(s: &mut ServerState, room_id: u32) {
         return;
     };
 
+    let ready_players = if let Some(room) = s.rooms.get(&room_id) {
+        room.ready_players.clone()
+    } else {
+        std::collections::HashSet::new()
+    };
+
     for &id in &players_clone {
-        let mut players_str: Vec<String> = players_clone
+        let mut players_str: Vec<(String, bool)> = players_clone
             .iter()
-            .map(|pid| s.clients.get(pid).unwrap().name.clone())
+            .map(|pid| (s.clients.get(pid).unwrap().name.clone(), ready_players.contains(pid) || *pid == host_id))
             .collect();
-        players_str.extend(bot_names.clone());
+        players_str.extend(bot_names.iter().map(|n| (n.clone(), true)));
+        
         let msg = ServerMessage::RoomState {
             room_id,
             players: players_str,
@@ -227,6 +235,7 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                 host_id: client_id,
                 players: vec![client_id],
                 state: GameState::new(),
+            ready_players: std::collections::HashSet::new(),
             };
 
             s.rooms.insert(room_id, room);
@@ -275,6 +284,20 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                 }
             }
         }
+        ClientMessage::ToggleReady => {
+            if let Some(client) = s.clients.get(&client_id) {
+                if let Some(room_id) = client.room_id {
+                    if let Some(r) = s.rooms.get_mut(&room_id) {
+                        if r.ready_players.contains(&client_id) {
+                            r.ready_players.remove(&client_id);
+                        } else {
+                            r.ready_players.insert(client_id);
+                        }
+                    }
+                    broadcast_room_state(&mut s, room_id);
+                }
+            }
+        }
         ClientMessage::StartGame => {
             if let Some(client) = s.clients.get(&client_id) {
                 if let Some(room_id) = client.room_id {
@@ -288,6 +311,14 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                         }
 
                         let room = s.rooms.get_mut(&room_id).unwrap();
+                        let required = room.players.len();
+                        let ready_count = room.ready_players.len() + 1;
+                        if (room.players.len() + room.state.players.iter().filter(|p| p.id >= 1000).count() > 1) && (ready_count >= required || required == 1) {
+                            // Proceed to start
+                        } else {
+                            send_to_client(&mut s, client_id, &ServerMessage::Error("Nem todos os jogadores estão prontos, ou não há jogadores suficientes!".to_string()));
+                            return;
+                        }
 
                         if room.state.phase == engine::event::GamePhase::Finished {
                             

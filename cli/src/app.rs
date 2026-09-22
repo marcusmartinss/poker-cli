@@ -10,6 +10,7 @@ pub enum AppMode {
     RoomHost,
     RoomGuest,
     GamePlay,
+    GamePlayRaising,
 }
 
 pub struct App {
@@ -28,7 +29,7 @@ pub struct App {
     pub my_id: usize,
     pub is_host: bool,
     pub rooms: Vec<RoomInfo>,
-    pub room_players: Vec<String>,
+    pub room_players: Vec<(String, bool)>,
     
     // Live Game State
     pub game_state: Option<GameState>,

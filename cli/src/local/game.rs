@@ -84,30 +84,43 @@ pub fn play_local(i18n: &I18n) {
                         KeyCode::Backspace => app.handle_backspace(),
                         KeyCode::Enter => {
                             let input = app.take_input();
-                            let amt_trim = input.trim().to_lowercase();
+                            let input_trim = input.trim();
+                            let amt_trim = input_trim.to_lowercase();
                             let call_amt = game_state.current_highest_bet - active_bet;
 
-                            let action_opt = if amt_trim == "1" {
-                                Some(PlayerAction::Fold)
-                            } else if amt_trim == "2" {
-                                if call_amt == 0 { Some(PlayerAction::Check) } else { Some(PlayerAction::Call) }
-                            } else if amt_trim == "3" {
-                                let raise_amt = std::cmp::min(game_state.min_raise, active_chips.saturating_sub(call_amt));
-                                Some(PlayerAction::Raise(raise_amt))
-                            } else if amt_trim == "all" {
-                                Some(PlayerAction::Raise(active_chips.saturating_sub(call_amt)))
-                            } else if amt_trim == "min" {
-                                let raise_amt = std::cmp::min(game_state.min_raise, active_chips.saturating_sub(call_amt));
-                                Some(PlayerAction::Raise(raise_amt))
-                            } else if let Ok(amt) = amt_trim.parse::<u32>() {
-                                Some(PlayerAction::Raise(amt))
+                            if app.mode == AppMode::GamePlayRaising {
+                                if let Ok(amt) = input_trim.parse::<u32>() {
+                                    if let Ok(events) = game_state.process_action(0, PlayerAction::Raise(amt)) {
+                                        process_events(&events, &game_state, &mut app.action_log, i18n);
+                                    }
+                                } else if amt_trim == "all" {
+                                    let call_amt = game_state.current_highest_bet - active_bet;
+                                    if let Ok(events) = game_state.process_action(0, PlayerAction::Raise(active_chips.saturating_sub(call_amt))) {
+                                        process_events(&events, &game_state, &mut app.action_log, i18n);
+                                    }
+                                }
+                                app.mode = AppMode::GamePlay;
                             } else {
-                                None
-                            };
+                                let action_opt = if amt_trim == "1" {
+                                    Some(PlayerAction::Fold)
+                                } else if amt_trim == "2" {
+                                    if call_amt == 0 { Some(PlayerAction::Check) } else { Some(PlayerAction::Call) }
+                                } else if amt_trim == "3" {
+                                    app.mode = AppMode::GamePlayRaising;
+                                    None
+                                } else if amt_trim == "all" {
+                                    Some(PlayerAction::Raise(active_chips.saturating_sub(call_amt)))
+                                } else if amt_trim == "min" {
+                                    let raise_amt = std::cmp::min(game_state.min_raise, active_chips.saturating_sub(call_amt));
+                                    Some(PlayerAction::Raise(raise_amt))
+                                } else {
+                                    None
+                                };
 
-                            if let Some(action) = action_opt {
-                                if let Ok(events) = game_state.process_action(0, action) {
-                                    process_events(&events, &game_state, &mut app.action_log, i18n);
+                                if let Some(action) = action_opt {
+                                    if let Ok(events) = game_state.process_action(0, action) {
+                                        process_events(&events, &game_state, &mut app.action_log, i18n);
+                                    }
                                 }
                             }
                         }

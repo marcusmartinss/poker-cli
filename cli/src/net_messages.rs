@@ -18,6 +18,7 @@ pub enum ClientMessage {
     JoinRoom { room_id: u32 },
     AddBot,
     StartGame,
+    ToggleReady,
     Action(PlayerAction),
     Chat(String),
 }
@@ -37,7 +38,7 @@ pub enum ServerMessage {
     },
     RoomState {
         room_id: u32,
-        players: Vec<String>,
+        players: Vec<(String, bool)>,
         is_host: bool,
     },
     GameUpdate {

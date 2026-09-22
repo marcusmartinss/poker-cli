@@ -106,11 +106,13 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                                         send_msg(ClientMessage::JoinRoom { room_id: id });
                                     }
                                 }
-                                AppMode::RoomHost => {
-                                    if input_trim == "s" {
+                                AppMode::RoomHost | AppMode::RoomGuest => {
+                                    if input_trim == "s" && app.mode == AppMode::RoomHost {
                                         send_msg(ClientMessage::StartGame);
-                                    } else if input_trim == "b" {
+                                    } else if input_trim == "b" && app.mode == AppMode::RoomHost {
                                         send_msg(ClientMessage::AddBot);
+                                    } else if input_trim == "r" {
+                                        send_msg(ClientMessage::ToggleReady);
                                     }
                                 }
                                 AppMode::GamePlay => {
@@ -124,25 +126,15 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                                                 let action_opt = if amt_trim == "1" {
                                                     Some(PlayerAction::Fold)
                                                 } else if amt_trim == "2" {
-                                                    if call_amt == 0 {
-                                                        Some(PlayerAction::Check)
-                                                    } else {
-                                                        Some(PlayerAction::Call)
-                                                    }
+                                                    if call_amt == 0 { Some(PlayerAction::Check) } else { Some(PlayerAction::Call) }
                                                 } else if amt_trim == "3" {
-                                                    // In ratatui we might want a separate Raising mode, 
-                                                    // but for now, typing '3' sends min raise if they don't type 'min' or an amount?
-                                                    // Let's just say "3" defaults to min_raise for simplicity, 
-                                                    // or they can literally type 'min' or 'all' directly!
-                                                    let raise_amt = std::cmp::min(game.min_raise, active_chips.saturating_sub(call_amt));
-                                                    Some(PlayerAction::Raise(raise_amt))
+                                                    app.mode = AppMode::GamePlayRaising;
+                                                    None
                                                 } else if amt_trim == "all" {
                                                     Some(PlayerAction::Raise(active_chips.saturating_sub(call_amt)))
                                                 } else if amt_trim == "min" {
                                                     let raise_amt = std::cmp::min(game.min_raise, active_chips.saturating_sub(call_amt));
                                                     Some(PlayerAction::Raise(raise_amt))
-                                                } else if let Ok(amt) = amt_trim.parse::<u32>() {
-                                                    Some(PlayerAction::Raise(amt))
                                                 } else {
                                                     None
                                                 };
@@ -154,7 +146,19 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                                         }
                                     }
                                 }
-                                _ => {}
+                                AppMode::GamePlayRaising => {
+                                    if let Some(game) = &app.game_state {
+                                        if let Ok(amt) = input_trim.parse::<u32>() {
+                                            send_msg(ClientMessage::Action(PlayerAction::Raise(amt)));
+                                        } else if input_trim.to_lowercase() == "all" {
+                                            if let Some(me) = game.players.iter().find(|p| p.id == app.my_id) {
+                                                let call_amt = game.current_highest_bet - me.current_bet;
+                                                send_msg(ClientMessage::Action(PlayerAction::Raise(me.chips.saturating_sub(call_amt))));
+                                            }
+                                        }
+                                        app.mode = AppMode::GamePlay;
+                                    }
+                                }
                             }
                         }
                     }
