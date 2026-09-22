@@ -186,6 +186,12 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
                     }
 
                     if game.current_turn == app.my_id && game.phase != engine::event::GamePhase::WaitingForPlayers && game.phase != engine::event::GamePhase::Finished {
+                        let elapsed = app.turn_start_time.elapsed().as_secs();
+                        let remaining = 15_u64.saturating_sub(elapsed);
+                        let color = if remaining <= 5 { ratatui::style::Color::Red } else { ratatui::style::Color::Green };
+                        main_text.push(Line::from(Span::styled(format!("SUA VEZ! Tempo restante: {}s", remaining), ratatui::style::Style::default().fg(color).add_modifier(ratatui::style::Modifier::BOLD))));
+                        main_text.push(Line::from(""));
+                        
                         if app.mode == AppMode::GamePlayRaising {
                             main_text.push(Line::from(format!("Valor para aumentar (min: {}):", game.min_raise)));
                             main_text.push(Line::from(format!("> {}", app.main_input)));
