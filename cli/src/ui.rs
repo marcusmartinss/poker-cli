@@ -160,7 +160,24 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
                 main_text.push(Line::from(""));
 
                 if let Some(me) = game.players.iter().find(|p| p.id == app.my_id) {
-                    main_text.push(Line::from("Suas Cartas:"));
+                    let mut title = vec![Span::raw("Suas Cartas:")];
+                    let mut all_cards = me.hole_cards.clone();
+                    all_cards.extend(game.community_cards.clone());
+                    
+                    if all_cards.len() == 2 {
+                        let rank_str = if all_cards[0].rank == all_cards[1].rank {
+                            i18n.t_hand("Pair")
+                        } else {
+                            i18n.t_hand("HighCard")
+                        };
+                        title.push(Span::styled(format!(" ({})", rank_str), ratatui::style::Style::default().fg(ratatui::style::Color::Yellow).add_modifier(ratatui::style::Modifier::BOLD)));
+                    } else if all_cards.len() >= 5 {
+                        if let Ok(rank) = engine::evaluator::evaluate(&all_cards) {
+                            let rank_str = i18n.t_hand(&format!("{:?}", rank));
+                            title.push(Span::styled(format!(" ({})", rank_str), ratatui::style::Style::default().fg(ratatui::style::Color::Yellow).add_modifier(ratatui::style::Modifier::BOLD)));
+                        }
+                    }
+                    main_text.push(Line::from(title));
                     if !me.hole_cards.is_empty() {
                         for line in draw_cards_ascii_lines(&me.hole_cards, false) {
                             main_text.push(line);
