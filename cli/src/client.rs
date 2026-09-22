@@ -190,7 +190,7 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                     app.game_state = Some(state);
                 }
                 ServerMessage::Chat { sender, message } => {
-                    app.action_log.push(format!("[Chat] {}: {}", sender, message));
+                    app.chat_messages.push(format!("{}: {}", sender, message));
                 }
             }
         }

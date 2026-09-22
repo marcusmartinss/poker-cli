@@ -183,31 +183,51 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
     f.render_widget(p, left_chunk);
 
 
-    // --- RIGHT PANE (Chat & Logs) ---
-    let chat_block = Block::default()
-        .title(" Logs & Chat (Tab) ")
-        .borders(Borders::ALL)
-        .border_type(border_type)
-        .style(if app.is_typing_chat { Style::default().fg(Color::Yellow) } else { block_style });
-
+    // --- RIGHT PANE (Logs & Chat) ---
     let right_layout = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(3)])
+        .constraints([
+            Constraint::Percentage(50), // Top: Game Logs
+            Constraint::Min(0),         // Bottom: Chat history
+            Constraint::Length(3)       // Bottom-most: Chat input
+        ])
         .split(right_chunk);
 
+    // 1. Logs
+    let logs_block = Block::default()
+        .title(" Ações (Logs) ")
+        .borders(Borders::ALL)
+        .border_type(border_type)
+        .style(block_style);
+        
     let log_items: Vec<ListItem> = app.action_log.iter()
         .skip(app.action_log.len().saturating_sub(50)) // Tail last 50
         .map(|msg| ListItem::new(Line::from(msg.clone())))
         .collect();
-
-    let logs_list = List::new(log_items).block(chat_block);
+    let logs_list = List::new(log_items).block(logs_block);
     f.render_widget(logs_list, right_layout[0]);
 
+    // 2. Chat Messages
+    let chat_block = Block::default()
+        .title(" Chat Global ")
+        .borders(Borders::ALL)
+        .border_type(border_type)
+        .style(block_style);
+        
+    let chat_items: Vec<ListItem> = app.chat_messages.iter()
+        .skip(app.chat_messages.len().saturating_sub(50)) // Tail last 50
+        .map(|msg| ListItem::new(Line::from(msg.clone())))
+        .collect();
+    let chat_list = List::new(chat_items).block(chat_block);
+    f.render_widget(chat_list, right_layout[1]);
+
+    // 3. Chat Input
     let chat_input_block = Block::default()
         .borders(Borders::ALL)
         .border_type(border_type)
-        .title(" Escrever ");
+        .title(" Mensagem (Pressione Tab para focar) ")
+        .style(if app.is_typing_chat { Style::default().fg(Color::Yellow) } else { block_style });
 
     let chat_input_text = Paragraph::new(format!("> {}", app.chat_input)).block(chat_input_block);
-    f.render_widget(chat_input_text, right_layout[1]);
+    f.render_widget(chat_input_text, right_layout[2]);
 }

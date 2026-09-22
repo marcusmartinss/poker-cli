@@ -22,6 +22,7 @@ pub struct App {
 
     // Chat history and logs
     pub action_log: Vec<String>,
+    pub chat_messages: Vec<String>,
     
     // Multiplayer Lobby State
     pub my_id: usize,
@@ -43,6 +44,7 @@ impl App {
             chat_input: String::new(),
             is_typing_chat: false,
             action_log: Vec::new(),
+            chat_messages: Vec::new(),
             my_id: 0,
             is_host: false,
             rooms: Vec::new(),
