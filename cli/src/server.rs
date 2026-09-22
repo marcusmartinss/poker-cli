@@ -417,7 +417,9 @@ fn process_bot_turns(s: &mut ServerState, room_id: u32) {
                 (base_win_rate + 0.15, base_win_rate - 0.05)
             };
 
-            let raise_amount = std::cmp::max(room.state.min_raise, if is_aggressive { 150 } else { 50 });
+            // Scale raises based on the pot to avoid infinite micro-raising wars
+            let pot_scaled_raise = room.state.pot / (if is_aggressive { 2 } else { 4 });
+            let raise_amount = std::cmp::max(room.state.min_raise, pot_scaled_raise);
             let total_raise_cost = amount_to_call + raise_amount;
 
             let action = if win_rate > raise_threshold && active_chips >= total_raise_cost {

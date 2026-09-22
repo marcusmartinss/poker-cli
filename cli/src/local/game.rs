@@ -250,7 +250,9 @@ fn handle_bot_turn(
         (base_win_rate + 0.15, base_win_rate - 0.05)
     };
 
-    let raise_amount = std::cmp::max(game.min_raise, if is_aggressive { 150 } else { 50 });
+    // Scale raises based on the pot to avoid infinite micro-raising wars
+    let pot_scaled_raise = game.pot / (if is_aggressive { 2 } else { 4 });
+    let raise_amount = std::cmp::max(game.min_raise, pot_scaled_raise);
     let total_raise_cost = amount_to_call + raise_amount;
 
     if win_rate > raise_threshold && active_chips >= total_raise_cost {
