@@ -138,7 +138,10 @@ pub fn play_local(i18n: &I18n) {
         }
 
         ui::render_table(&i18n, &game);
-        ui::render_showdown(&i18n, &game);
+        let active_count = game.players.iter().filter(|p| !p.is_folded).count();
+        if active_count > 1 {
+            ui::render_showdown(&i18n, &game);
+        }
 
         println!("  {}", i18n.t("final_actions"));
         let recent = if action_log.len() > 8 {

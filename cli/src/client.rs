@@ -346,7 +346,10 @@ fn render_game_screen(state: &engine::state::GameState, my_id: usize, is_host: b
     if state.phase == engine::event::GamePhase::Showdown
         || state.phase == engine::event::GamePhase::Finished
     {
-        crate::ui::render_showdown(i18n, state);
+        let active_count = state.players.iter().filter(|p| !p.is_folded).count();
+        if active_count > 1 {
+            crate::ui::render_showdown(i18n, state);
+        }
     }
 
     println!("  [ {} ]", i18n.t("final_actions"));
