@@ -226,11 +226,22 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
         .border_type(border_type)
         .style(block_style);
         
-    let log_items: Vec<ListItem> = app.action_log.iter()
-        .skip(app.action_log.len().saturating_sub(50)) // Tail last 50
-        .map(|msg| ListItem::new(Line::from(msg.clone())))
-        .collect();
-    let logs_list = List::new(log_items).block(logs_block);
+    let log_width = right_layout[0].width.saturating_sub(2) as usize;
+    let log_height = right_layout[0].height.saturating_sub(2) as usize;
+    let mut log_items = Vec::new();
+    for msg in app.action_log.iter().skip(app.action_log.len().saturating_sub(50)) {
+        let chars: Vec<char> = msg.chars().collect();
+        if chars.is_empty() {
+            log_items.push(ListItem::new(Line::from("")));
+        } else {
+            for chunk in chars.chunks(log_width.max(1)) {
+                let chunk_str: String = chunk.iter().collect();
+                log_items.push(ListItem::new(Line::from(chunk_str)));
+            }
+        }
+    }
+    let visible_logs: Vec<ListItem> = log_items.into_iter().rev().take(log_height).rev().collect();
+    let logs_list = List::new(visible_logs).block(logs_block);
     f.render_widget(logs_list, right_layout[0]);
 
     // 2. Chat Messages
@@ -240,11 +251,22 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
         .border_type(border_type)
         .style(block_style);
         
-    let chat_items: Vec<ListItem> = app.chat_messages.iter()
-        .skip(app.chat_messages.len().saturating_sub(50)) // Tail last 50
-        .map(|msg| ListItem::new(Line::from(msg.clone())))
-        .collect();
-    let chat_list = List::new(chat_items).block(chat_block);
+    let chat_width = right_layout[1].width.saturating_sub(2) as usize;
+    let chat_height = right_layout[1].height.saturating_sub(2) as usize;
+    let mut chat_items = Vec::new();
+    for msg in app.chat_messages.iter().skip(app.chat_messages.len().saturating_sub(50)) {
+        let chars: Vec<char> = msg.chars().collect();
+        if chars.is_empty() {
+            chat_items.push(ListItem::new(Line::from("")));
+        } else {
+            for chunk in chars.chunks(chat_width.max(1)) {
+                let chunk_str: String = chunk.iter().collect();
+                chat_items.push(ListItem::new(Line::from(chunk_str)));
+            }
+        }
+    }
+    let visible_chat: Vec<ListItem> = chat_items.into_iter().rev().take(chat_height).rev().collect();
+    let chat_list = List::new(visible_chat).block(chat_block);
     f.render_widget(chat_list, right_layout[1]);
 
     // 3. Chat Input
