@@ -372,7 +372,7 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                         room.state.players.retain(|p| p.name != "KICKED" && (p.id >= 1000 || room.players.contains(&p.id)));
                         let required = room.players.len();
                         let ready_count = room.ready_players.len();
-                        if (room.players.len() + room.state.players.iter().filter(|p| p.id >= 1000).count() > 1) && (ready_count >= required || required == 1) {
+                        if (room.players.len() + room.state.players.iter().filter(|p| p.id >= 1000).count() > 1) && (ready_count >= required) {
                             // Proceed to start
                         } else {
                             send_to_client(&mut s, client_id, &ServerMessage::Error("Nem todos os jogadores estão prontos, ou a sala precisa de no mínimo 2 jogadores!".to_string()));

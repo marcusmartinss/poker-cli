@@ -169,6 +169,15 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
 
                     if game.phase == engine::event::GamePhase::Finished {
                         main_text.push(Line::from(""));
+                        
+                        // Busca quem ganhou no log e exibe no meio da tela bem grande
+                        for log in app.action_log.iter().rev().take(15) {
+                            if log.starts_with("***") {
+                                main_text.push(Line::from(Span::styled(log.clone(), ratatui::style::Style::default().fg(ratatui::style::Color::Yellow).add_modifier(ratatui::style::Modifier::BOLD))));
+                            }
+                        }
+                        main_text.push(Line::from(""));
+
                         if app.is_host {
                             main_text.push(Line::from(Span::styled("Pressione [Enter] para iniciar a próxima mão.", ratatui::style::Style::default().fg(ratatui::style::Color::Green))));
                         } else {
