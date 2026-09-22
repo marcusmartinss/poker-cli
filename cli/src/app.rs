@@ -34,6 +34,7 @@ pub struct App {
     // Live Game State
     pub game_state: Option<GameState>,
     pub connection_error: Option<String>,
+    pub turn_start_time: std::time::Instant,
 }
 
 impl App {
@@ -51,6 +52,7 @@ impl App {
             room_players: Vec::new(),
             game_state: None,
             connection_error: None,
+            turn_start_time: std::time::Instant::now(),
         }
     }
 

@@ -90,8 +90,15 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                                             break;
                                         }
                                         Some("help") | Some("ajuda") => {
-                                            app.chat_messages.push("[Sistema] Comandos disponíveis: /quit (Sair)".to_string());
-                                            app.chat_messages.push("[Sistema] O host pode expulsar usando o lobby.".to_string());
+                                            app.chat_messages.push("[Sistema] Comandos disponíveis: /quit (Sair), /kick <nome>".to_string());
+                                        }
+                                        Some("kick") => {
+                                            if parts.len() > 1 {
+                                                let target = parts[1..].join(" ");
+                                                send_msg(ClientMessage::Kick(target));
+                                            } else {
+                                                app.chat_messages.push("[Sistema] Uso: /kick <nome_do_jogador>".to_string());
+                                            }
                                         }
                                         _ => {
                                             app.chat_messages.push(format!("[Sistema] Comando desconhecido: {}", msg));

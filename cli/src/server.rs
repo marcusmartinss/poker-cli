@@ -298,6 +298,64 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                 }
             }
         }
+        ClientMessage::Kick(target_name) => {
+            let mut target_id = None;
+            let mut room_id_opt = None;
+            let mut is_bot_kick = false;
+            if let Some(client) = s.clients.get(&client_id) {
+                if let Some(r_id) = client.room_id {
+                    let room = s.rooms.get(&r_id).unwrap();
+                    if room.host_id == client_id {
+                        room_id_opt = Some(r_id);
+                        if let Some(bot) = room.state.players.iter().find(|p| p.id >= 1000 && p.name == target_name) {
+                            target_id = Some(bot.id);
+                            is_bot_kick = true;
+                        } else {
+                            for (&pid, c) in &s.clients {
+                                if c.room_id == Some(r_id) && c.name == target_name {
+                                    target_id = Some(pid);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if let (Some(t_id), Some(r_id)) = (target_id, room_id_opt) {
+                if !is_bot_kick {
+                    send_to_client(&mut s, t_id, &ServerMessage::Error("Você foi removido da sala pelo Host.".to_string()));
+                }
+                
+                let (is_playing, events_to_broadcast) = if let Some(room) = s.rooms.get_mut(&r_id) {
+                    room.players.retain(|&id| id != t_id);
+                    let is_playing = room.state.phase != engine::event::GamePhase::WaitingForPlayers
+                        && room.state.phase != engine::event::GamePhase::Finished;
+                    let mut events_out = None;
+                    if is_playing {
+                        if let Ok(events) = room.state.process_action(t_id, engine::event::PlayerAction::Fold) {
+                            events_out = Some(events);
+                        }
+                        if let Some(p) = room.state.players.iter_mut().find(|p| p.id == t_id) {
+                            p.is_folded = true;
+                            p.chips = 0;
+                            p.name = "KICKED".to_string(); // Mark for permanent removal
+                        }
+                    }
+                    (is_playing, events_out)
+                } else {
+                    (false, None)
+                };
+
+                if is_playing {
+                    if let Some(events) = events_to_broadcast {
+                        broadcast_game_update(&mut s, r_id, events);
+                        process_bot_turns(&mut s, r_id);
+                    }
+                } else {
+                    broadcast_room_state(&mut s, r_id);
+                }
+            }
+        }
         ClientMessage::StartGame => {
             if let Some(client) = s.clients.get(&client_id) {
                 if let Some(room_id) = client.room_id {
@@ -311,6 +369,7 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                         }
 
                         let room = s.rooms.get_mut(&room_id).unwrap();
+                        room.state.players.retain(|p| p.name != "KICKED" && (p.id >= 1000 || room.players.contains(&p.id)));
                         let required = room.players.len();
                         let ready_count = room.ready_players.len();
                         if (room.players.len() + room.state.players.iter().filter(|p| p.id >= 1000).count() > 1) && (ready_count >= required || required == 1) {

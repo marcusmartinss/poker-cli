@@ -17,6 +17,7 @@ pub enum ClientMessage {
     CreateRoom { room_name: String },
     JoinRoom { room_id: u32 },
     AddBot,
+    Kick(String),
     StartGame,
     ToggleReady,
     Action(PlayerAction),

@@ -167,6 +167,15 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
                         }
                     }
 
+                    if game.phase == engine::event::GamePhase::Finished {
+                        main_text.push(Line::from(""));
+                        if app.is_host {
+                            main_text.push(Line::from(Span::styled("Pressione [Enter] para iniciar a próxima mão.", ratatui::style::Style::default().fg(ratatui::style::Color::Green))));
+                        } else {
+                            main_text.push(Line::from(Span::styled("Aguardando o host iniciar a próxima mão...", ratatui::style::Style::default().fg(ratatui::style::Color::Yellow))));
+                        }
+                    }
+
                     if game.current_turn == app.my_id && game.phase != engine::event::GamePhase::WaitingForPlayers && game.phase != engine::event::GamePhase::Finished {
                         if app.mode == AppMode::GamePlayRaising {
                             main_text.push(Line::from(format!("Valor para aumentar (min: {}):", game.min_raise)));
