@@ -5,7 +5,7 @@ use crate::i18n::I18n;
 use engine::card::Card;
 
 fn draw_cards_ascii_lines(cards: &[Card], is_board: bool) -> Vec<Line<'static>> {
-    let mut lines = vec![String::new(); 5];
+    let mut spans_lines: Vec<Vec<Span<'static>>> = vec![vec![], vec![], vec![], vec![], vec![]];
     let total_cards = if is_board { 5 } else { cards.len() };
 
     for i in 0..total_cards {
@@ -15,21 +15,25 @@ fn draw_cards_ascii_lines(cards: &[Card], is_board: bool) -> Vec<Line<'static>> 
             let pad_left = if r.len() == 2 { "" } else { " " };
             let pad_right = if r.len() == 2 { "" } else { " " };
 
-            lines[0].push_str("┌───────┐ ");
-            lines[1].push_str(&format!("│ {}{}    │ ", r, pad_left));
-            lines[2].push_str(&format!("│   {}   │ ", s));
-            lines[3].push_str(&format!("│    {}{} │ ", pad_right, r));
-            lines[4].push_str("└───────┘ ");
+            let is_red = cards[i].suit == engine::card::Suit::Hearts || cards[i].suit == engine::card::Suit::Diamonds;
+            let style = if is_red { Style::default().fg(Color::Red) } else { Style::default() };
+
+            spans_lines[0].push(Span::styled("┌───────┐ ", style));
+            spans_lines[1].push(Span::styled(format!("│ {}{}    │ ", r, pad_left), style));
+            spans_lines[2].push(Span::styled(format!("│   {}   │ ", s), style));
+            spans_lines[3].push(Span::styled(format!("│    {}{} │ ", pad_right, r), style));
+            spans_lines[4].push(Span::styled("└───────┘ ", style));
         } else if is_board {
-            lines[0].push_str("┌───────┐ ");
-            lines[1].push_str("│ ░░░░░ │ ");
-            lines[2].push_str("│ ░░░░░ │ ");
-            lines[3].push_str("│ ░░░░░ │ ");
-            lines[4].push_str("└───────┘ ");
+            let style = Style::default().fg(Color::DarkGray);
+            spans_lines[0].push(Span::styled("┌───────┐ ", style));
+            spans_lines[1].push(Span::styled("│ ░░░░░ │ ", style));
+            spans_lines[2].push(Span::styled("│ ░░░░░ │ ", style));
+            spans_lines[3].push(Span::styled("│ ░░░░░ │ ", style));
+            spans_lines[4].push(Span::styled("└───────┘ ", style));
         }
     }
 
-    lines.into_iter().map(Line::from).collect()
+    spans_lines.into_iter().map(Line::from).collect()
 }
 
 pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {

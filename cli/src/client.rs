@@ -187,6 +187,13 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                 ServerMessage::GameUpdate { state, events, your_id: _ } => {
                     app.mode = AppMode::GamePlay;
                     crate::event_logger::process_events(&events, &state, &mut app.action_log, i18n);
+                    
+                    if let Some(me) = state.players.iter().find(|p| p.id == app.my_id) {
+                        if me.chips == 0 && !me.is_all_in {
+                            app.is_typing_chat = true;
+                        }
+                    }
+                    
                     app.game_state = Some(state);
                 }
                 ServerMessage::Chat { sender, message } => {
