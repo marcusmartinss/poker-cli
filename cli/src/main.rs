@@ -54,10 +54,13 @@ fn main() {
 
         match mode_input.trim() {
             "2" => {
+                static SERVER_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
                 // Start server in background
-                std::thread::spawn(|| {
-                    server::start_server(8080);
-                });
+                if !SERVER_RUNNING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                    std::thread::spawn(|| {
+                        server::start_server(8080);
+                    });
+                }
                 // Give server a moment to start
                 std::thread::sleep(std::time::Duration::from_millis(500));
                 // Connect to our own server
