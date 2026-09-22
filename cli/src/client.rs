@@ -134,7 +134,11 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                                 }
                                 AppMode::GamePlay => {
                                     if let Some(game) = &app.game_state {
-                                        if game.players[game.current_turn].id == app.my_id {
+                                        if game.phase == engine::event::GamePhase::Finished {
+                                            if app.is_host {
+                                                send_msg(ClientMessage::StartGame);
+                                            }
+                                        } else if game.players[game.current_turn].id == app.my_id {
                                             if let Some(me) = game.players.iter().find(|p| p.id == app.my_id) {
                                                 let call_amt = game.current_highest_bet - me.current_bet;
                                                 let active_chips = me.chips;

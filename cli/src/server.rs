@@ -175,7 +175,7 @@ fn broadcast_room_state(s: &mut ServerState, room_id: u32) {
     for &id in &players_clone {
         let mut players_str: Vec<(String, bool)> = players_clone
             .iter()
-            .map(|pid| (s.clients.get(pid).unwrap().name.clone(), ready_players.contains(pid) || *pid == host_id))
+            .map(|pid| (s.clients.get(pid).unwrap().name.clone(), ready_players.contains(pid)))
             .collect();
         players_str.extend(bot_names.iter().map(|n| (n.clone(), true)));
         
@@ -312,7 +312,7 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
 
                         let room = s.rooms.get_mut(&room_id).unwrap();
                         let required = room.players.len();
-                        let ready_count = room.ready_players.len() + 1;
+                        let ready_count = room.ready_players.len();
                         if (room.players.len() + room.state.players.iter().filter(|p| p.id >= 1000).count() > 1) && (ready_count >= required || required == 1) {
                             // Proceed to start
                         } else {
