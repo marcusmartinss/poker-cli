@@ -74,6 +74,9 @@ impl I18n {
                 "player_busted" => "A player was eliminated!",
                 "you_won_game" => "You eliminated everyone and WON THE GAME!",
                 "select_mode" => "Select Mode:",
+                "mode_local" => "Play Local (Offline Bots)",
+                "mode_host" => "Host LAN Game",
+                "mode_join" => "Join LAN Game",
                 _ => "???",
             },
             Language::Portuguese => match key {
@@ -135,6 +138,9 @@ impl I18n {
                 "player_busted" => "Um jogador foi eliminado da mesa!",
                 "you_won_game" => "Você eliminou todos os bots e VENCEU O JOGO!",
                 "select_mode" => "Escolha o Modo:",
+                "mode_local" => "Jogar Local (Bots Offline)",
+                "mode_host" => "Criar Jogo na LAN (Host)",
+                "mode_join" => "Entrar em Jogo na LAN",
                 _ => "???",
             },
         }

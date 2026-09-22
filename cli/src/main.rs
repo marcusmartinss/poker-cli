@@ -39,9 +39,9 @@ fn main() {
     println!("                 TEXAS HOLD'EM CLI                       ");
     println!("=========================================================\n");
     println!("  {}", i18n.t("select_mode"));
-    println!("    [1] Play Local (Offline Bots)");
-    println!("    [2] Host LAN Game");
-    println!("    [3] Join LAN Game");
+    println!("    [1] {}", i18n.t("mode_local"));
+    println!("    [2] {}", i18n.t("mode_host"));
+    println!("    [3] {}", i18n.t("mode_join"));
 
     loop {
         print!("\n  => ");
@@ -145,8 +145,8 @@ fn main() {
         println!("                 TEXAS HOLD'EM CLI                       ");
         println!("=========================================================\n");
         println!("  {}", i18n.t("select_mode"));
-        println!("    [1] Play Local (Offline Bots)");
-        println!("    [2] Host LAN Game");
-        println!("    [3] Join LAN Game");
+        println!("    [1] {}", i18n.t("mode_local"));
+        println!("    [2] {}", i18n.t("mode_host"));
+        println!("    [3] {}", i18n.t("mode_join"));
     }
 }
