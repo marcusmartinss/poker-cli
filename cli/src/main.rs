@@ -6,6 +6,7 @@ mod i18n;
 mod local;
 mod net_messages;
 mod server;
+mod old_ui;
 mod ui;
 mod app;
 mod tui;

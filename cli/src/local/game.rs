@@ -1,6 +1,6 @@
 use crate::event_logger::process_events;
 use crate::i18n::I18n;
-use crate::ui;
+use crate::old_ui as ui;
 use engine::event::{GamePhase, PlayerAction};
 use engine::player::Player;
 use engine::state::GameState;

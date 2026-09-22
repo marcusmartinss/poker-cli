@@ -1,0 +1,174 @@
+use engine::card::Card;
+use engine::state::GameState;
+
+pub fn draw_cards_ascii(cards: &[Card], is_board: bool) {
+    if cards.is_empty() && !is_board {
+        return;
+    }
+
+    let mut lines = vec![String::new(); 5];
+    let total_cards = if is_board { 5 } else { cards.len() };
+
+    for i in 0..total_cards {
+        if i < cards.len() {
+            let r = cards[i].rank.to_string();
+            let s = cards[i].suit.to_string();
+            
+            let is_red = cards[i].suit == engine::card::Suit::Hearts || cards[i].suit == engine::card::Suit::Diamonds;
+            let (c_start, c_end) = if is_red { ("[31m", "[0m") } else { ("", "") };
+
+            let pad_left = if r.len() == 2 { "" } else { " " };
+            let pad_right = if r.len() == 2 { "" } else { " " };
+
+            lines[0].push_str(&format!("{}┌───────┐{} ", c_start, c_end));
+            lines[1].push_str(&format!("{}│ {}{}    │{} ", c_start, r, pad_left, c_end));
+            lines[2].push_str(&format!("{}│   {}   │{} ", c_start, s, c_end));
+            lines[3].push_str(&format!("{}│    {}{} │{} ", c_start, pad_right, r, c_end));
+            lines[4].push_str(&format!("{}└───────┘{} ", c_start, c_end));
+        } else if is_board {
+            // Draw empty placeholders for community cards not yet dealt
+            lines[0].push_str("┌───────┐ ");
+            lines[1].push_str("│ ░░░░░ │ ");
+            lines[2].push_str("│ ░░░░░ │ ");
+            lines[3].push_str("│ ░░░░░ │ ");
+            lines[4].push_str("└───────┘ ");
+        }
+    }
+
+    for line in lines {
+        println!("    {}", line);
+    }
+}
+
+pub fn render_table(i18n: &crate::i18n::I18n, game: &GameState) {
+    // Clear screen and reset cursor
+    print!("{}[2J{}[1;1H", 27 as char, 27 as char);
+
+    println!("=========================================================");
+    println!(
+        "  {}: {}  |  {}: ${}  |  {}: ${}",
+        i18n.t("phase"),
+        i18n.t_phase(&game.phase),
+        i18n.t("pot"),
+        game.pot,
+        i18n.t("highest_bet"),
+        game.current_highest_bet
+    );
+    println!("=========================================================\n");
+
+    println!("  {}", i18n.t("board_cards"));
+    draw_cards_ascii(&game.community_cards, true);
+    println!();
+
+    println!("---------------------------------------------------------");
+    println!("  {}", i18n.t("players"));
+    println!("  +----+------+-----------------+--------+---------+------------+");
+    let header = i18n.t("table_header").replace("{}", "=>");
+    println!("{}", header);
+    println!("  +----+------+-----------------+--------+---------+------------+");
+    let _num_players = game.players.len();
+    let active_count = game.players.iter().filter(|p| p.chips > 0 || p.is_all_in).count();
+    let true_sb = if active_count == 2 { game.dealer_button } else { game.next_active_player(game.dealer_button) };
+    let true_bb = if active_count == 2 { game.next_active_player(game.dealer_button) } else { game.next_active_player(true_sb) };
+    
+    for (i, p) in game.players.iter().enumerate() {
+        let is_dealer = game.dealer_button == i;
+        let is_sb = true_sb == i;
+        let is_bb = true_bb == i;
+
+        let role_token = if is_dealer {
+            "[D]"
+        } else if is_sb {
+            "[SB]"
+        } else if is_bb {
+            "[BB]"
+        } else {
+            ""
+        };
+
+        let active_token = if game.current_turn == i { "=>" } else { "  " };
+
+        let status = if p.chips == 0 && !p.is_all_in {
+            i18n.t("eliminated")
+        } else if p.is_folded {
+            i18n.t("folded")
+        } else if p.is_all_in {
+            i18n.t("all_in")
+        } else {
+            ""
+        };
+
+        let mut name = p.name.clone();
+        if name.chars().count() > 15 {
+            name = name.chars().take(12).collect::<String>();
+            name.push_str("...");
+        }
+
+        println!(
+            "  | {:<2} | {:<4} | {:<15} | ${:<5} | ${:<6} | {:<10} |",
+            active_token, role_token, name, p.chips, p.current_bet, status
+        );
+    }
+    println!("  +----+------+-----------------+--------+---------+------------+");
+    println!("---------------------------------------------------------\n");
+}
+
+pub fn render_showdown(i18n: &crate::i18n::I18n, game: &GameState) {
+    println!("\n=========================================================");
+    println!(
+        "                 {}                         ",
+        i18n.t("showdown_reveal")
+    );
+    println!("=========================================================");
+    for p in &game.players {
+        if p.is_folded {
+            println!("\n  {} {}", p.name, i18n.t("folded_end"));
+        } else {
+            // Evaluate their hand for display
+            let mut all_cards = game.community_cards.clone();
+            all_cards.extend(p.hole_cards.clone());
+            let raw_hand = if all_cards.len() == 2 {
+                if all_cards[0].rank == all_cards[1].rank {
+                    "Pair".to_string()
+                } else {
+                    "HighCard".to_string()
+                }
+            } else {
+                match engine::evaluator::evaluate(&all_cards) {
+                    Ok(rank) => format!("{:?}", rank),
+                    Err(_) => "Unknown".to_string(),
+                }
+            };
+            let hand_name = i18n.t_hand(&raw_hand);
+
+            let possessive_str = i18n.t_player_cards(p.id == 0, &p.name);
+            println!("\n  {} - {} ", possessive_str, hand_name);
+            draw_cards_ascii(&p.hole_cards, false);
+        }
+    }
+    println!("=========================================================\n");
+}
+
+use ratatui::prelude::*;
+use ratatui::widgets::*;
+use crate::app::App;
+
+pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &crate::i18n::I18n) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+        .split(f.size());
+
+    let game_block = Block::default()
+        .title(" Texas Hold'em ")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded);
+    
+    let chat_block = Block::default()
+        .title(" Chat & Logs ")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded);
+
+    f.render_widget(Paragraph::new("Game UI WIP...").block(game_block), chunks[0]);
+    f.render_widget(Paragraph::new("Chat UI WIP...").block(chat_block), chunks[1]);
+}
