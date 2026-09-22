@@ -3,7 +3,6 @@ use ratatui::widgets::*;
 use crate::app::{App, AppMode};
 use crate::i18n::I18n;
 use engine::card::Card;
-use engine::state::GameState;
 
 fn draw_cards_ascii_lines(cards: &[Card], is_board: bool) -> Vec<Line<'static>> {
     let mut lines = vec![String::new(); 5];

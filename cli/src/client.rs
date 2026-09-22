@@ -4,7 +4,7 @@ use crate::net_messages::{ClientMessage, ServerMessage};
 use crate::tui::Tui;
 use crate::ui;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
-use std::io::{self, Write};
+use std::io::Write;
 use std::net::TcpStream;
 use std::sync::mpsc;
 use std::thread;
