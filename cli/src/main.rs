@@ -71,12 +71,16 @@ fn main() {
                     {
                         let _ = socket.send_to(b"POKER_DISCOVER", "255.255.255.255:8081");
 
-                        let mut buf = [0; 32];
+                        let mut buf = [0; 64];
                         while let Ok((amt, src)) = socket.recv_from(&mut buf) {
-                            if &buf[..amt] == b"POKER_SERVER" {
+                            if amt >= 12 && &buf[0..12] == b"POKER_SERVER" {
                                 let ip = src.ip().to_string();
-                                if !servers.contains(&ip) {
-                                    servers.push(ip);
+                                let mut name = if amt > 13 { String::from_utf8_lossy(&buf[13..amt]).to_string() } else { "Unknown Server".to_string() };
+                                if name.is_empty() {
+                                    name = "Unknown Server".to_string();
+                                }
+                                if !servers.iter().any(|(s_ip, _)| s_ip == &ip) {
+                                    servers.push((ip, name));
                                 }
                             }
                         }
@@ -97,8 +101,8 @@ fn main() {
                 ip
             } else {
                 println!("\n  Found {} server(s):", servers.len());
-                for (i, ip) in servers.iter().enumerate() {
-                    println!("    [{}] {}", i + 1, ip);
+                for (i, (_ip, name)) in servers.iter().enumerate() {
+                    println!("    [{}] {}", i + 1, name);
                 }
                 println!("    [M] Enter IP Manually");
                 print!("  => ");
@@ -110,7 +114,7 @@ fn main() {
 
                 if let Ok(idx) = sel.parse::<usize>() {
                     if idx > 0 && idx <= servers.len() {
-                        servers[idx - 1].clone()
+                        servers[idx - 1].0.clone()
                     } else {
                         "127.0.0.1".to_string()
                     }
