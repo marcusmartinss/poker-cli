@@ -39,11 +39,12 @@ pub fn start_server(port: u16) {
     // UDP Discovery Server
     if let Ok(udp_socket) = std::net::UdpSocket::bind("0.0.0.0:8081") {
         thread::spawn(move || {
-            let mut buf = [0; 32];
+            let server_name = format!("POKER_SERVER:Server of {}", std::env::var("USER").unwrap_or_else(|_| "Host".to_string()));
+            let mut buf = [0; 64];
             loop {
                 if let Ok((amt, src)) = udp_socket.recv_from(&mut buf) {
                     if &buf[..amt] == b"POKER_DISCOVER" {
-                        let _ = udp_socket.send_to(b"POKER_SERVER", src);
+                        let _ = udp_socket.send_to(server_name.as_bytes(), src);
                     }
                 }
             }
