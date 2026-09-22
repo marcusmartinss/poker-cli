@@ -199,9 +199,13 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
         while let Ok(msg) = server_rx.try_recv() {
             match msg {
                 ServerMessage::Error(e) => {
-                    app.connection_error = Some(e);
+                    app.connection_error = Some(e.clone());
                     if app.mode == AppMode::RoomCreating || app.mode == AppMode::RoomJoining {
                         app.mode = AppMode::Lobby;
+                    }
+                    if e == "Você foi removido da sala pelo Host." {
+                        app.mode = AppMode::Lobby;
+                        app.game_state = None;
                     }
                 }
                 ServerMessage::Welcome { player_id } => {

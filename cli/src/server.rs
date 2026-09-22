@@ -324,6 +324,17 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
             if let (Some(t_id), Some(r_id)) = (target_id, room_id_opt) {
                 if !is_bot_kick {
                     send_to_client(&mut s, t_id, &ServerMessage::Error("Você foi removido da sala pelo Host.".to_string()));
+                    if let Some(c) = s.clients.get_mut(&t_id) {
+                        c.room_id = None;
+                    }
+                    let rooms: Vec<crate::net_messages::RoomInfo> = s.rooms.values().map(|r| crate::net_messages::RoomInfo {
+                        id: r.id,
+                        name: r.name.clone(),
+                        player_count: r.players.len(),
+                        max_players: 8,
+                        has_started: r.state.phase != engine::event::GamePhase::WaitingForPlayers,
+                    }).collect();
+                    send_to_client(&mut s, t_id, &ServerMessage::LobbyState { rooms });
                 }
                 
                 let (is_playing, events_to_broadcast) = if let Some(room) = s.rooms.get_mut(&r_id) {
