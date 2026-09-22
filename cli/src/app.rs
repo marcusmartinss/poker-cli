@@ -27,7 +27,7 @@ pub struct App {
     pub my_id: usize,
     pub is_host: bool,
     pub rooms: Vec<RoomInfo>,
-    pub room_players: Vec<(usize, String)>,
+    pub room_players: Vec<String>,
     
     // Live Game State
     pub game_state: Option<GameState>,

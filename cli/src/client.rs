@@ -1,22 +1,15 @@
+use crate::app::{App, AppMode};
 use crate::i18n::I18n;
 use crate::net_messages::{ClientMessage, ServerMessage};
-use engine::event::PlayerAction;
+use crate::tui::Tui;
+use crate::ui;
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use std::io::{self, Write};
 use std::net::TcpStream;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
-
-enum InputMode {
-    Name,
-    Lobby,
-    LobbyCreatingRoom,
-    LobbyJoiningRoom,
-    RoomHost,
-    RoomGuest,
-    GamePlay,
-    GamePlayRaising,
-}
+use engine::event::PlayerAction;
 
 pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
     let stream = match TcpStream::connect(format!("{}:{}", ip, port)) {
@@ -31,7 +24,6 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
     let mut write_stream = stream.try_clone().unwrap();
 
     let (server_tx, server_rx) = mpsc::channel();
-    let (input_tx, input_rx) = mpsc::channel();
 
     // Server Reader Thread
     thread::spawn(move || {
@@ -46,7 +38,7 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                     }
                     line.clear();
                 }
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     thread::sleep(Duration::from_millis(50));
                 }
                 Err(_) => break,
@@ -54,370 +46,153 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
         }
     });
 
-    // Stdin Reader Thread
-    thread::spawn(move || {
-        loop {
-            let mut input = String::new();
-            if io::stdin().read_line(&mut input).is_ok() {
-                let _ = input_tx.send(input.trim().to_string());
-            }
-        }
-    });
+    let mut app = App::new();
+    let mut tui = Tui::init().unwrap();
 
-    let mut mode = InputMode::Name;
-    let mut my_id = 0;
-    let mut is_host = false;
-    let mut game_state_opt: Option<engine::state::GameState> = None;
-    let mut action_log: Vec<String> = Vec::new();
-
-    // Helper closure to send msg
     let mut send_msg = |msg: ClientMessage| {
         let mut json = serde_json::to_string(&msg).unwrap();
         json.push('\n');
         let _ = write_stream.write_all(json.as_bytes());
     };
 
-    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-    println!("--- Multiplayer Poker ---");
-    print!("Enter your name: ");
-    let _ = io::stdout().flush();
-
     loop {
-        // Handle User Input
-        if let Ok(input) = input_rx.try_recv() {
-            if input.starts_with("/c ") {
-                let msg = input.trim_start_matches("/c ").trim();
-                if !msg.is_empty() {
-                    send_msg(ClientMessage::Chat(msg.to_string()));
-                }
-                continue;
-            }
-            match mode {
-                InputMode::Name => {
-                    send_msg(ClientMessage::JoinServer {
-                        name: input.clone(),
-                    });
-                }
-                InputMode::Lobby => match input.as_str() {
-                    "1" => {
-                        print!("Room name: ");
-                        let _ = io::stdout().flush();
-                        mode = InputMode::LobbyCreatingRoom;
-                    }
-                    "2" => {
-                        print!("Room ID to join: ");
-                        let _ = io::stdout().flush();
-                        mode = InputMode::LobbyJoiningRoom;
-                    }
-                    _ => println!("Invalid option."),
-                },
-                InputMode::LobbyCreatingRoom => {
-                    let room_name = if input.is_empty() {
-                        "My Room".to_string()
-                    } else {
-                        input
-                    };
-                    send_msg(ClientMessage::CreateRoom { room_name });
-                    mode = InputMode::Lobby;
-                }
-                InputMode::LobbyJoiningRoom => {
-                    if let Ok(id) = input.parse::<u32>() {
-                        send_msg(ClientMessage::JoinRoom { room_id: id });
-                    } else {
-                        println!("Invalid Room ID.");
-                    }
-                    mode = InputMode::Lobby;
-                }
-                InputMode::RoomHost => match input.as_str() {
-                    "1" => send_msg(ClientMessage::AddBot),
-                    "2" => send_msg(ClientMessage::StartGame),
-                    _ => println!("Invalid option."),
-                },
-                InputMode::RoomGuest => {
-                    // Nothing to do
-                }
-                InputMode::GamePlayRaising => {
-                    if let Some(game) = &game_state_opt {
-                        if let Some(me) = game.players.iter().find(|p| p.id == my_id) {
-                            let amt_trim = input.to_lowercase();
-                            let call_amt = game.current_highest_bet - me.current_bet;
+        // 1. Render UI
+        let _ = tui.terminal.draw(|f| ui::render_ratatui(f, &app, i18n));
 
-                            let action = if amt_trim == "all" {
-                                if me.chips <= call_amt {
-                                    Some(PlayerAction::Call)
-                                } else {
-                                    Some(PlayerAction::Raise(me.chips - call_amt))
+        // 2. Poll Input
+        if event::poll(Duration::from_millis(16)).unwrap() {
+            if let Event::Key(key) = event::read().unwrap() {
+                if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                    break;
+                }
+                match key.code {
+                    KeyCode::Esc => {
+                        if app.is_typing_chat {
+                            app.is_typing_chat = false;
+                        } else {
+                            break;
+                        }
+                    }
+                    KeyCode::Tab => {
+                        app.is_typing_chat = !app.is_typing_chat;
+                    }
+                    KeyCode::Char(c) => app.handle_char(c),
+                    KeyCode::Backspace => app.handle_backspace(),
+                    KeyCode::Enter => {
+                        if app.is_typing_chat {
+                            let msg = app.take_chat();
+                            if !msg.is_empty() {
+                                send_msg(ClientMessage::Chat(msg));
+                            }
+                        } else {
+                            let input = app.take_input();
+                            let input_trim = input.trim();
+                            match app.mode {
+                                AppMode::NameInput => {
+                                    send_msg(ClientMessage::JoinServer { name: input_trim.to_string() });
                                 }
-                            } else if amt_trim == "min" {
-                                let available_to_raise = me.chips.saturating_sub(call_amt);
-                                if available_to_raise == 0 {
-                                    Some(PlayerAction::Call)
-                                } else {
-                                    let raise_amt = std::cmp::min(game.min_raise, available_to_raise);
-                                    Some(PlayerAction::Raise(raise_amt))
+                                AppMode::Lobby => {
+                                    if input_trim == "1" {
+                                        app.mode = AppMode::RoomCreating;
+                                    } else if input_trim == "2" {
+                                        app.mode = AppMode::RoomJoining;
+                                    }
                                 }
-                            } else if let Ok(amt) = amt_trim.parse::<u32>() {
-                                Some(PlayerAction::Raise(amt))
-                            } else {
-                                println!("Invalid amount.");
-                                None
-                            };
-
-                            if let Some(a) = action {
-                                send_msg(ClientMessage::Action(a));
-                            } else {
-                                let call_amt = game.current_highest_bet - me.current_bet;
-                                let menu_str = if call_amt == 0 {
-                                    format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
-                                } else {
-                                    format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
-                                };
-                                print!("{}\n=> ", menu_str);
-                                let _ = io::stdout().flush();
+                                AppMode::RoomCreating => {
+                                    send_msg(ClientMessage::CreateRoom { room_name: input_trim.to_string() });
+                                }
+                                AppMode::RoomJoining => {
+                                    if let Ok(id) = input_trim.parse::<u32>() {
+                                        send_msg(ClientMessage::JoinRoom { room_id: id });
+                                    }
+                                }
+                                AppMode::RoomHost => {
+                                    if input_trim == "s" {
+                                        send_msg(ClientMessage::StartGame);
+                                    } else if input_trim == "b" {
+                                        send_msg(ClientMessage::AddBot);
+                                    }
+                                }
+                                AppMode::GamePlay => {
+                                    if let Some(game) = &app.game_state {
+                                        if game.players[game.current_turn].id == app.my_id {
+                                            if let Some(me) = game.players.iter().find(|p| p.id == app.my_id) {
+                                                let call_amt = game.current_highest_bet - me.current_bet;
+                                                let active_chips = me.chips;
+                                                let amt_trim = input_trim.to_lowercase();
+                                                
+                                                let action_opt = if amt_trim == "1" {
+                                                    Some(PlayerAction::Fold)
+                                                } else if amt_trim == "2" {
+                                                    if call_amt == 0 {
+                                                        Some(PlayerAction::Check)
+                                                    } else {
+                                                        Some(PlayerAction::Call)
+                                                    }
+                                                } else if amt_trim == "3" {
+                                                    // In ratatui we might want a separate Raising mode, 
+                                                    // but for now, typing '3' sends min raise if they don't type 'min' or an amount?
+                                                    // Let's just say "3" defaults to min_raise for simplicity, 
+                                                    // or they can literally type 'min' or 'all' directly!
+                                                    let raise_amt = std::cmp::min(game.min_raise, active_chips.saturating_sub(call_amt));
+                                                    Some(PlayerAction::Raise(raise_amt))
+                                                } else if amt_trim == "all" {
+                                                    Some(PlayerAction::Raise(active_chips.saturating_sub(call_amt)))
+                                                } else if amt_trim == "min" {
+                                                    let raise_amt = std::cmp::min(game.min_raise, active_chips.saturating_sub(call_amt));
+                                                    Some(PlayerAction::Raise(raise_amt))
+                                                } else if let Ok(amt) = amt_trim.parse::<u32>() {
+                                                    Some(PlayerAction::Raise(amt))
+                                                } else {
+                                                    None
+                                                };
+                                                
+                                                if let Some(action) = action_opt {
+                                                    send_msg(ClientMessage::Action(action));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {}
                             }
                         }
                     }
-                    mode = InputMode::GamePlay;
-                }
-                InputMode::GamePlay => {
-                    if let Some(game) = &game_state_opt {
-                        if game.phase == engine::event::GamePhase::Finished {
-                            if is_host {
-                                send_msg(ClientMessage::StartGame);
-                            }
-                        } else if let Some(_me) = game.players.iter().find(|p| p.id == my_id) {
-                            if game.current_turn < game.players.len()
-                                && game.players[game.current_turn].id == my_id
-                            {
-                                    let call_amt = game.current_highest_bet - _me.current_bet;
-                                    match input.as_str() {
-                                        "1" => send_msg(ClientMessage::Action(PlayerAction::Fold)),
-                                        "2" => if call_amt == 0 { send_msg(ClientMessage::Action(PlayerAction::Check)) } else { send_msg(ClientMessage::Action(PlayerAction::Call)) },
-                                        "3" => {
-                                        print!("{} (Min: {}): ", i18n.t("raise_prompt").trim_end_matches(": "), game.min_raise);
-                                        let _ = io::stdout().flush();
-                                        mode = InputMode::GamePlayRaising;
-                                    }
-                                    _ => {
-                                        println!("Unknown command.");
-                                            let call_amt = game.current_highest_bet - _me.current_bet;
-                                            let menu_str = if call_amt == 0 {
-                                                format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
-                                            } else {
-                                                format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
-                                            };
-                                            print!("{}
-=> ", menu_str);
-                                        let _ = io::stdout().flush();
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    _ => {}
                 }
             }
         }
 
-        // Handle Server Messages
-        if let Ok(msg) = server_rx.try_recv() {
+        // 3. Poll Server Messages
+        while let Ok(msg) = server_rx.try_recv() {
             match msg {
                 ServerMessage::Error(e) => {
-                    println!("[ERROR] {}", i18n.t(&e));
-                    if matches!(mode, InputMode::Name) {
-                        print!("Try another name: ");
-                        let _ = io::stdout().flush();
-                    } else if matches!(mode, InputMode::GamePlay)
-                        || matches!(mode, InputMode::GamePlayRaising)
-                    {
-                        if let Some(game) = &game_state_opt {
-                            if game.players[game.current_turn].id == my_id {
-                                if let Some(me) = game.players.iter().find(|p| p.id == my_id) {
-                                    let call_amt = game.current_highest_bet - me.current_bet;
-                                    let menu_str = if call_amt == 0 {
-                                        format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
-                                    } else {
-                                        format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
-                                    };
-                                    print!("{}\n{esc}[0m", menu_str, esc = 27 as char);
-                                    print!("{}", i18n.t("action_prompt"));
-                                    let _ = io::stdout().flush();
-                                }
-                            }
-                        }
+                    app.connection_error = Some(e);
+                    if app.mode == AppMode::RoomCreating || app.mode == AppMode::RoomJoining {
+                        app.mode = AppMode::Lobby;
                     }
                 }
                 ServerMessage::Welcome { player_id } => {
-                    my_id = player_id;
-                    mode = InputMode::Lobby;
+                    app.my_id = player_id;
+                    app.mode = AppMode::Lobby;
                 }
                 ServerMessage::LobbyState { rooms } => {
-                    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-                    println!("=== MULTIPLAYER LOBBY ===");
-                    for r in rooms {
-                        let status = if r.has_started {
-                            "IN PROGRESS"
-                        } else {
-                            "WAITING"
-                        };
-                        println!(" [{}] {} ({}/8) - {}", r.id, r.name, r.player_count, status);
-                    }
-                    println!("\n[1] Create Room");
-                    println!("[2] Join Room");
-                    print!("\n=> ");
-                    let _ = io::stdout().flush();
+                    app.rooms = rooms;
                 }
-                ServerMessage::RoomState {
-                    room_id,
-                    players,
-                    is_host: h,
-                } => {
-                    is_host = h;
-                    mode = if is_host {
-                        InputMode::RoomHost
-                    } else {
-                        InputMode::RoomGuest
-                    };
-
-                    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-                    println!("=== ROOM {} ===", room_id);
-                    println!("Players:");
-                    for (i, p) in players.iter().enumerate() {
-                        println!(" {}. {}", i + 1, p);
-                    }
-
-                    if is_host {
-                        println!("\nHost Menu:");
-                        println!(" [1] Add Bot");
-                        println!(" [2] Start Game");
-                        print!("\n=> ");
-                    } else {
-                        println!("\nWaiting for host to start the game...");
-                    }
-                    let _ = io::stdout().flush();
+                ServerMessage::RoomState { room_id: _, players, is_host } => {
+                    app.is_host = is_host;
+                    app.room_players = players;
+                    app.mode = if is_host { AppMode::RoomHost } else { AppMode::RoomGuest };
                 }
-                ServerMessage::GameUpdate {
-                    state,
-                    events,
-                    your_id,
-                } => {
-                    mode = InputMode::GamePlay;
-                    my_id = your_id;
-                    game_state_opt = Some(state.clone());
-
-                    // Render events
-                    crate::process_events(&events, &state, &mut action_log, i18n);
-
-                    render_game_screen(&state, my_id, is_host, &action_log, i18n, matches!(mode, InputMode::GamePlayRaising));
+                ServerMessage::GameUpdate { state, events, your_id: _ } => {
+                    app.mode = AppMode::GamePlay;
+                    crate::event_logger::process_events(&events, &state, &mut app.action_log, i18n);
+                    app.game_state = Some(state);
                 }
                 ServerMessage::Chat { sender, message } => {
-                    if let Some(game) = &game_state_opt {
-                        let msg_str = format!("[CHAT] {}: {}", sender, message);
-                        action_log.push(msg_str);
-                        render_game_screen(game, my_id, is_host, &action_log, i18n, matches!(mode, InputMode::GamePlayRaising));
-                    } else {
-                        // In lobby
-                        print!("{esc}[2K\x0D", esc = 27 as char);
-                        println!("[CHAT] {}: {}", sender, message);
-                        if matches!(mode, InputMode::Name) {
-                            print!("Enter your name: ");
-                        } else if matches!(mode, InputMode::Lobby) {
-                            print!("\nChoose an option: ");
-                        } else if matches!(mode, InputMode::LobbyCreatingRoom) {
-                            print!("Room name: ");
-                        } else if matches!(mode, InputMode::LobbyJoiningRoom) {
-                            print!("Room ID to join: ");
-                        } else if matches!(mode, InputMode::RoomHost) {
-                            print!("\n=> ");
-                        }
-                        let _ = std::io::Write::flush(&mut std::io::stdout());
-                    }
-                }
-            }
-        }
-
-        thread::sleep(Duration::from_millis(10));
-    }
-}
-
-fn render_game_screen(state: &engine::state::GameState, my_id: usize, is_host: bool, action_log: &[String], i18n: &crate::i18n::I18n, is_raising: bool) {
-    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-    crate::ui::render_table(i18n, state);
-
-    if state.phase == engine::event::GamePhase::Showdown
-        || state.phase == engine::event::GamePhase::Finished
-    {
-        let active_count = state.players.iter().filter(|p| !p.is_folded).count();
-        if active_count > 1 {
-            crate::ui::render_showdown(i18n, state);
-        }
-    }
-
-    println!("  [ {} ]", i18n.t("final_actions"));
-    let recent = if action_log.len() > 10 {
-        &action_log[action_log.len() - 10..]
-    } else {
-        &action_log[..]
-    };
-    for msg in recent {
-        println!("   > {}", msg);
-    }
-    println!("---------------------------------------------------------\n");
-
-    if state.phase == engine::event::GamePhase::Finished {
-        if is_host {
-            println!("{}", i18n.t("press_enter"));
-        } else {
-            println!("Hand Finished. Waiting for Host to start next hand...");
-        }
-    } else if state.phase != engine::event::GamePhase::Showdown {
-        // Display my cards if I'm not folded and not finished
-        if let Some(me) = state.players.iter().find(|p| p.id == my_id) {
-            if me.hole_cards.len() == 2 {
-                let mut my_cards = state.community_cards.clone();
-                my_cards.extend(me.hole_cards.clone());
-                let raw_hand = if my_cards.len() == 2 {
-                    if my_cards[0].rank == my_cards[1].rank {
-                        "Pair".to_string()
-                    } else {
-                        "HighCard".to_string()
-                    }
-                } else {
-                    match engine::evaluator::evaluate(&my_cards) {
-                        Ok(rank) => format!("{:?}", rank),
-                        Err(_) => "".to_string(),
-                    }
-                };
-                println!(
-                    "  {} ( {} )",
-                    i18n.t("your_cards"),
-                    i18n.t_hand(&raw_hand)
-                );
-                crate::ui::draw_cards_ascii(&me.hole_cards, false);
-                println!();
-            }
-        }
-
-        // Check if it's my turn
-        if state.current_turn < state.players.len()
-            && state.players[state.current_turn].id == my_id
-        {
-            if let Some(me) = state.players.iter().find(|p| p.id == my_id) {
-                let call_amt = state.current_highest_bet - me.current_bet;
-                let menu_str = if call_amt == 0 {
-                    format!("{}: [1] {} | [2] {} | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_check"), i18n.t("menu_raise"))
-                } else {
-                    format!("{}: [1] {} | [2] {} (${}) | [3] {}", i18n.t("menu_actions"), i18n.t("menu_fold"), i18n.t("menu_call"), call_amt, i18n.t("menu_raise"))
-                };
-                println!("{}", i18n.t("your_turn"));
-                
-                if is_raising {
-                    print!("{} (Min: {}): ", i18n.t("raise_prompt").trim_end_matches(": "), state.min_raise);
-                } else {
-                    println!("{}", menu_str);
-                    print!("{}", i18n.t("action_prompt"));
+                    app.action_log.push(format!("[Chat] {}: {}", sender, message));
                 }
             }
         }
     }
-    let _ = std::io::Write::flush(&mut std::io::stdout());
 }
