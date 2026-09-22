@@ -62,6 +62,7 @@ pub fn play_local(i18n: &I18n) {
                     }
                 }
             }
+            app.turn_start_time = std::time::Instant::now();
             app.game_state = Some(game_state);
             continue;
         }
@@ -137,6 +138,17 @@ pub fn play_local(i18n: &I18n) {
                 process_events(&events, &game_state, &mut app.action_log, i18n);
             }
             std::thread::sleep(Duration::from_millis(500));
+        }
+        let mut turn_advanced = false;
+        if let Some(old_state) = &app.game_state {
+            if old_state.current_turn != game_state.current_turn || old_state.phase != game_state.phase {
+                turn_advanced = true;
+            }
+        } else {
+            turn_advanced = true;
+        }
+        if turn_advanced {
+            app.turn_start_time = std::time::Instant::now();
         }
         app.game_state = Some(game_state);
     }

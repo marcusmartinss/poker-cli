@@ -222,6 +222,17 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                     app.mode = if is_host { AppMode::RoomHost } else { AppMode::RoomGuest };
                 }
                 ServerMessage::GameUpdate { state, events, your_id: _ } => {
+                    let mut turn_advanced = false;
+                    if let Some(old_state) = &app.game_state {
+                        if old_state.current_turn != state.current_turn || old_state.phase != state.phase {
+                            turn_advanced = true;
+                        }
+                    } else {
+                        turn_advanced = true;
+                    }
+                    if turn_advanced {
+                        app.turn_start_time = std::time::Instant::now();
+                    }
                     app.mode = AppMode::GamePlay;
                     crate::event_logger::process_events(&events, &state, &mut app.action_log, i18n);
                     
