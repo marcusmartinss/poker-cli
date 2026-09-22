@@ -1,57 +1,45 @@
 # Texas Hold'em CLI ♠️♥️♣️♦️
 
-Um jogo completo de **Texas Hold'em Poker** desenhado para ser jogado diretamente no seu terminal. Desenvolvido inteiramente em **Rust**, o jogo traz uma interface ASCII limpa, inteligência artificial baseada em simulações de Monte Carlo e suporte a multiplayer via rede local (LAN).
+Um jogo completo de **Texas Hold'em Poker** desenhado para ser jogado diretamente no seu terminal. Desenvolvido inteiramente em **Rust**, o jogo foca em uma interface ASCII rápida, multiplayer descentralizado (LAN) e uma IA inteligente.
 
-## Funcionalidades
+## 🚀 Como Começar
 
-- **Multiplayer LAN (Host & Play):** Hospede um servidor no seu computador e jogue com amigos na mesma rede. O servidor gerencia salas simultâneas de forma robusta utilizando TCP.
-- **Descoberta Automática:** Encontra automaticamente servidores rodando na mesma rede Wi-Fi/LAN sem precisar digitar IPs manualmente!
-- **Singleplayer com IA:** Jogue offline contra bots controlados pelo computador. Os bots utilizam simulações matemáticas (Monte Carlo) para avaliar a força da mão em tempo real e decidir se devem blefar, apostar, cobrir ou correr.
-- **Multilíngue (i18n):** Suporte nativo para **Português (BR)** e **Inglês (EN)**. O idioma pode ser escolhido ao iniciar o jogo.
-- **Motor de Regras Preciso:** Validação estrita das regras do Texas Hold'em, incluindo apostas (Raise/Call/Fold), avaliação de mãos (High Card a Royal Flush), All-in e divisão correta de potes.
-- **UI Limpa:** Uma interface de terminal renderizada em blocos ASCII, focada na legibilidade, com limpeza de tela inteligente para uma experiência fluida.
+### 1. Instale o Rust (Cargo)
+Se você usa Linux ou macOS, instale o Rust com o comando oficial:
+```bash
+curl https://sh.rustup.rs -sSf | sh
+```
+*(Para Windows, acesse [rustup.rs](https://rustup.rs/))*
 
-## Requisitos
+### 2. Baixe e Rode o Jogo
+```bash
+git clone https://github.com/seu-usuario/poker-cli.git
+cd poker-cli
+cargo run
+```
+*Dica:* Para que os cálculos da IA offline rodem quase instantaneamente, use `cargo run --release`.
 
-Para rodar o jogo, você precisará ter a linguagem **Rust** e o gerenciador de pacotes **Cargo** instalados no seu sistema.
+## 🎮 Como Jogar
 
-- [Instale o Rust (rustup)](https://rustup.rs/) (Requer versão 1.70 ou superior).
+O jogo suporta **Inglês** e **Português**. No menu principal, você escolhe seu modo:
 
-## Como Rodar
+- **Play Local:** Treine contra bots offline (Agressivo e Conservador).
+- **Host LAN Game:** Cria um servidor no seu PC e te coloca num Lobby. Seus amigos na mesma rede Wi-Fi podem entrar na sua sala facilmente.
+- **Join LAN Game:** Escaneia sua rede local automaticamente buscando por Hosts (sem necessidade de digitar IP manualmente) e lista os servidores disponíveis.
 
-1. Clone o repositório para sua máquina:
-   ```bash
-   git clone https://github.com/seu-usuario/poker-cli.git
-   cd poker-cli
-   ```
+### Comandos da Mesa
+- Responda aos menus numéricos (`1` Correr, `2` Mesa/Pagar, `3` Aumentar).
+- Atalhos de aposta: Ao aumentar, digite `min` para a aposta mínima permitida, ou `all` para dar All-In.
+- **Chat:** Digite `/c sua mensagem` em qualquer momento para enviar mensagens aos outros jogadores no painel de "Últimas Ações".
 
-2. Compile e execute o jogo:
-   ```bash
-   cargo run --release
-   ```
-   *Nota: Usar `--release` faz com que os cálculos matemáticos dos bots rodem muito mais rápido.*
+## 🛠️ Destaques da Engine
 
-## Como Jogar
+- **Economia Deep Stack & Torneio:** Todos iniciam com impressionantes **$10.000**. Os *Blinds* começam em `$100/$200` e sobem dinamicamente a cada 5 mãos, forçando a ação.
+- **Muck Rule:** Blefou e todo mundo correu? O jogo garante o mistério não revelando as suas cartas!
+- **Monte Carlo AI:** A inteligência artificial calcula a probabilidade de vitória simulando milhares de desfechos futuros com as cartas da mesa antes de agir.
+- **P2P Robusto:** O cliente possui resiliência contra falhas de rede. Se a conexão cair, você é redirecionado suavemente ao menu principal sem que o jogo crashe no terminal.
 
-Ao iniciar o jogo, você poderá escolher o idioma e, em seguida, o modo de jogo:
-
-1. **Play Local (Bots):** Joga uma partida offline contra o "Bot Agressivo" e o "Bot Conservador".
-2. **Host LAN Game:** Cria um servidor em background e conecta você automaticamente a um Lobby. Você pode criar salas, adicionar bots dinamicamente e iniciar a partida para quem se conectar.
-3. **Join LAN Game:** Busca e lista automaticamente os servidores hospedados na sua rede local. Basta escolher o número correspondente para conectar!
-
-Durante o jogo, basta digitar os números correspondentes às ações na tela (Ex: `1` para Correr, `3` para Pagar, `4` para Aumentar).
-
-## Arquitetura do Projeto
-
-O código-fonte adota as melhores práticas de modularização do Rust, separando a lógica pura do jogo e a interface:
-
-- `engine/` **(Biblioteca):** Motor independente do jogo. Avalia as cartas, gerencia o baralho, aplica as regras do Hold'em, processa os turnos (`state.rs`) e contém o núcleo da Inteligência Artificial (`ai.rs`). Não possui dependências de I/O.
-- `cli/` **(Binário):** Aplicação interativa de terminal. Gerencia os menus, a tradução (`i18n.rs`), a renderização ASCII (`ui.rs`), o protocolo de rede serializado via Serde (`net_messages.rs`) e a infraestrutura TCP de Cliente/Servidor com descoberta UDP.
-
-## Contribuindo
-
-Sinta-se livre para abrir *Issues* ou *Pull Requests*. Algumas áreas de melhoria futuras incluem:
-- Cálculo avançado de *Side Pots* para múltiplos *All-ins* assimétricos.
-- Melhorias estéticas e cores no terminal via crates como `crossterm`.
-- Aprimoramento das personalidades dinâmicas da IA na rede.
-
+## 📦 Arquitetura
+O projeto usa uma separação limpa:
+- `engine/`: O núcleo lógico. Independente, gerenciando estado, baralho, validando regras de aposta e avaliando a força da mão.
+- `cli/`: A interface do usuário e rede TCP/UDP. Lida com renderização ASCII, internacionalização (i18n), serialização e servidores assíncronos.
