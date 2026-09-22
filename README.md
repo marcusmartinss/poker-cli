@@ -13,7 +13,7 @@ curl https://sh.rustup.rs -sSf | sh
 
 ### 2. Baixe e Rode o Jogo
 ```bash
-git clone https://github.com/seu-usuario/poker-cli.git
+git clone https://github.com/marcusmartinss/poker-cli.git
 cd poker-cli
 cargo run
 ```
