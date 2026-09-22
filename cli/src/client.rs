@@ -82,7 +82,24 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                         if app.is_typing_chat {
                             let msg = app.take_chat();
                             if !msg.is_empty() {
-                                send_msg(ClientMessage::Chat(msg));
+                                if msg.starts_with('/') {
+                                    let cmd = msg.trim_start_matches('/');
+                                    let parts: Vec<&str> = cmd.split_whitespace().collect();
+                                    match parts.first().copied() {
+                                        Some("quit") | Some("leave") | Some("sair") => {
+                                            break;
+                                        }
+                                        Some("help") | Some("ajuda") => {
+                                            app.chat_messages.push("[Sistema] Comandos disponíveis: /quit (Sair)".to_string());
+                                            app.chat_messages.push("[Sistema] O host pode expulsar usando o lobby.".to_string());
+                                        }
+                                        _ => {
+                                            app.chat_messages.push(format!("[Sistema] Comando desconhecido: {}", msg));
+                                        }
+                                    }
+                                } else {
+                                    send_msg(ClientMessage::Chat(msg));
+                                }
                             }
                         } else {
                             let input = app.take_input();

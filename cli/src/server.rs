@@ -316,7 +316,7 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                         if (room.players.len() + room.state.players.iter().filter(|p| p.id >= 1000).count() > 1) && (ready_count >= required || required == 1) {
                             // Proceed to start
                         } else {
-                            send_to_client(&mut s, client_id, &ServerMessage::Error("Nem todos os jogadores estão prontos, ou não há jogadores suficientes!".to_string()));
+                            send_to_client(&mut s, client_id, &ServerMessage::Error("Nem todos os jogadores estão prontos, ou a sala precisa de no mínimo 2 jogadores!".to_string()));
                             return;
                         }
 
@@ -333,16 +333,7 @@ fn process_message(client_id: usize, msg: ClientMessage, state_arc: &Arc<Mutex<S
                             }
                         }
 
-                        if room.state.players.len() < 2 {
-                            send_to_client(
-                                &mut s,
-                                client_id,
-                                &ServerMessage::Error(
-                                    "Not enough players with chips to start.".to_string(),
-                                ),
-                            );
-                            return;
-                        }
+
 
                         if let Ok(events) = room.state.start_game() {
                             broadcast_game_update(&mut s, room_id, events);
