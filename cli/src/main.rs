@@ -7,6 +7,7 @@ mod local;
 mod net_messages;
 mod server;
 mod ui;
+mod tui;
 
 pub use event_logger::process_events;
 use i18n::{I18n, Language};
