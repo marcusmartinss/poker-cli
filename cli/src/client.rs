@@ -200,6 +200,7 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
             match msg {
                 ServerMessage::Error(e) => {
                     app.connection_error = Some(e.clone());
+                    app.connection_error_time = Some(std::time::Instant::now());
                     if app.mode == AppMode::RoomCreating || app.mode == AppMode::RoomJoining {
                         app.mode = AppMode::Lobby;
                     }
