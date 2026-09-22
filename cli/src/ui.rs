@@ -212,7 +212,7 @@ pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &I18n) {
                             main_text.push(Line::from(""));
                             
                             if app.mode == AppMode::GamePlayRaising {
-                                main_text.push(Line::from(format!("Valor para aumentar (min: {}):", game.min_raise)));
+                                main_text.push(Line::from(format!("Valor para aumentar (min: {}, ou 'min'/'all'):", game.min_raise)));
                                 main_text.push(Line::from(format!("> {}", app.main_input)));
                             } else {
                                 let call_amt = game.current_highest_bet - me.current_bet;

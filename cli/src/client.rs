@@ -184,6 +184,12 @@ pub fn start_client(ip: &str, port: u16, i18n: &I18n) {
                                                 let call_amt = game.current_highest_bet - me.current_bet;
                                                 send_msg(ClientMessage::Action(PlayerAction::Raise(me.chips.saturating_sub(call_amt))));
                                             }
+                                        } else if input_trim.to_lowercase() == "min" {
+                                            if let Some(me) = game.players.iter().find(|p| p.id == app.my_id) {
+                                                let call_amt = game.current_highest_bet - me.current_bet;
+                                                let raise_amt = std::cmp::min(game.min_raise, me.chips.saturating_sub(call_amt));
+                                                send_msg(ClientMessage::Action(PlayerAction::Raise(raise_amt)));
+                                            }
                                         }
                                         app.mode = AppMode::GamePlay;
                                     }

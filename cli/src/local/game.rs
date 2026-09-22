@@ -99,6 +99,12 @@ pub fn play_local(i18n: &I18n) {
                                     if let Ok(events) = game_state.process_action(0, PlayerAction::Raise(active_chips.saturating_sub(call_amt))) {
                                         process_events(&events, &game_state, &mut app.action_log, i18n);
                                     }
+                                } else if amt_trim == "min" {
+                                    let call_amt = game_state.current_highest_bet - active_bet;
+                                    let raise_amt = std::cmp::min(game_state.min_raise, active_chips.saturating_sub(call_amt));
+                                    if let Ok(events) = game_state.process_action(0, PlayerAction::Raise(raise_amt)) {
+                                        process_events(&events, &game_state, &mut app.action_log, i18n);
+                                    }
                                 }
                                 app.mode = AppMode::GamePlay;
                             } else {
