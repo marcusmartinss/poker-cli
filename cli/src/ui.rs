@@ -148,3 +148,27 @@ pub fn render_showdown(i18n: &crate::i18n::I18n, game: &GameState) {
     }
     println!("=========================================================\n");
 }
+
+use ratatui::prelude::*;
+use ratatui::widgets::*;
+use crate::app::App;
+
+pub fn render_ratatui(f: &mut ratatui::Frame, app: &App, i18n: &crate::i18n::I18n) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+        .split(f.size());
+
+    let game_block = Block::default()
+        .title(" Texas Hold'em ")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded);
+    
+    let chat_block = Block::default()
+        .title(" Chat & Logs ")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded);
+
+    f.render_widget(Paragraph::new("Game UI WIP...").block(game_block), chunks[0]);
+    f.render_widget(Paragraph::new("Chat UI WIP...").block(chat_block), chunks[1]);
+}
